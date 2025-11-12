@@ -3,8 +3,5 @@ langchain
 langchain-groq
 langchain-community
 groq
-opencv-python-headless
-pillow
-numpy
-plotly>=5.0
+plotly
 pandas

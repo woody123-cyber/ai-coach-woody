@@ -1,16 +1,11 @@
-# COACH WOODY v10 — The Ultimate AI Fitness + IELTS Coach
+# COACH WOODY v16 — Fitness + Nutrition | Woody (Male) / Hibiki (Female)
 import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-import cv2
-import numpy as np
-from PIL import Image
-import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 from datetime import datetime, timedelta
-import io
 
 # === CONFIG ===
 st.set_page_config(page_title="Coach Woody", page_icon="trophy", layout="wide")
@@ -18,44 +13,23 @@ st.set_page_config(page_title="Coach Woody", page_icon="trophy", layout="wide")
 # === SECRETS ===
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
-# === MODE TOGGLE ===
-mode = st.sidebar.radio("Mode", ["Fitness Coach", "IELTS Speaking Coach"], horizontal=True)
+# === GENDER TOGGLE ===
+gender = st.sidebar.radio("Coach Gender", ["Male (Woody)", "Female (Hibiki)"], horizontal=True)
+coach_name = "Woody" if gender == "Male (Woody)" else "Hibiki"
 
 # === LLM ===
 llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=GROQ_API_KEY, temperature=0.7)
-
-# === PROMPTS ===
-if mode == "Fitness Coach":
-    system_prompt = """
-    You are Coach Woody, world-class fitness coach. Fun, encouraging, under 120 words.
-    User: {level}, Goal: {goal}
-    Track: strength (grip/type), cardio (pace/speed/incline), cycling (RPM/resistance)
-    History: {history}
-    Celebrate PBs! Use emojis.
-    User: {input}
-    Coach Woody:
-    """
-else:
-    system_prompt = """
-    You are Coach Woody, IELTS Band 8+ Speaking Coach.
-    Give feedback: fluency, vocab, grammar, pronunciation.
-    Suggest 1 improvement. Under 150 words.
-    Part: {part}
-    User said: {input}
-    Coach Woody:
-    """
-
-prompt = ChatPromptTemplate.from_template(system_prompt)
-chain = prompt | llm | StrOutputParser()
 
 # === SESSION STATE ===
 if "messages" not in st.session_state:
     st.session_state.messages = []
     st.session_state.level = "Beginner"
     st.session_state.goal = "Run a 5K"
-    st.session_state.part = "Part 1"
-    st.session_state.progress = []
+    st.session_state.progress_fitness = []
+    st.session_state.progress_nutrition = []
     st.session_state.name = ""
+    st.session_state.calorie_goal = 2000
+    st.session_state.macro_goal = {"protein": 150, "carbs": 250, "fats": 70}
 
 # === USER NAME ===
 if not st.session_state.name:
@@ -64,242 +38,240 @@ if not st.session_state.name:
         st.session_state.name = name
         st.sidebar.success(f"Welcome, {name}!")
 
-# === SIDEBAR: LOG WORKOUTS ===
-with st.sidebar:
-    st.header(f"{st.session_state.name or 'Athlete'}'s Log")
+# === TABS ===
+tab1, tab2 = st.tabs(["Fitness Coach", "Nutrition Coach"])
 
-    if mode == "Fitness Coach":
-        st.session_state.level = st.selectbox("Level", ["Beginner", "Intermediate", "Advanced"])
-        st.session_state.goal = st.text_input("Goal", st.session_state.goal)
+# ========================================
+# TAB 1: FITNESS COACH
+# ========================================
+with tab1:
+    st.title(f"{coach_name} — Fitness Mode")
 
-        workout = st.selectbox("Log", [
+    # Fitness Prompt
+    fitness_prompt = f"""
+    You are {coach_name}, {'motivational strength coach' if gender == 'Male (Woody)' else 'graceful, empowering trainer'}.
+    Be fun, encouraging, under 120 words. Use emojis.
+    User: {st.session_state.level}, Goal: {st.session_state.goal}
+    Track workouts. Suggest based on progress.
+    History: {{history}}
+    User: {{input}}
+    {coach_name}:
+    """
+    prompt = ChatPromptTemplate.from_template(fitness_prompt)
+    chain = prompt | llm | StrOutputParser()
+
+    # === SIDEBAR: LOG FITNESS ===
+    with st.sidebar:
+        st.session_state.level = st.selectbox("Level", ["Beginner", "Intermediate", "Advanced"], key="fit_level")
+        st.session_state.goal = st.text_input("Goal", st.session_state.goal, key="fit_goal")
+
+        workout = st.selectbox("Log Workout", [
             "Push-ups", "Pull-ups", "Sit-ups",
             "Run", "Walk (Outdoor)", "Walk (Treadmill)",
             "Cycle (Outdoor)", "Cycle (Static Bike)"
-        ])
+        ], key="fit_workout")
 
-        # === STRENGTH ===
+        # Strength
         if workout in ["Push-ups", "Pull-ups", "Sit-ups"]:
-            st.subheader(f"{workout}")
             variations = {
                 "Push-ups": ["Normal", "Close-Grip", "Wide-Grip"],
                 "Pull-ups": ["Normal", "Chin-ups", "Neutral-Grip"],
                 "Sit-ups": ["Standard", "Russian Twists", "Leg Raises"]
             }
-            variation = st.selectbox("Type", variations[workout])
-            reps = st.number_input("Reps", min_value=0, value=0)
-            if st.button(f"Log {workout}"):
+            variation = st.selectbox("Variation", variations[workout], key="fit_var")
+            reps = st.number_input("Reps", min_value=0, value=0, key="fit_reps")
+            if st.button("Log Workout", key="fit_log"):
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d"),
                     "type": workout.lower().replace("-", "_"),
                     "variation": variation,
                     "reps": reps
                 }
-                st.session_state.progress.append(entry)
+                st.session_state.progress_fitness.append(entry)
                 st.success(f"Logged {reps} {variation} {workout.lower()}!")
 
-        # === RUN ===
+        # Run
         elif workout == "Run":
-            st.subheader("Run")
-            distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
-            time_min = st.number_input("Time (min)", min_value=0)
-            if st.button("Log Run"):
+            distance = st.number_input("Distance (km)", min_value=0.0, step=0.1, key="fit_dist")
+            time_min = st.number_input("Time (min)", min_value=0, key="fit_time")
+            if st.button("Log Run", key="fit_log_run"):
                 if distance > 0 and time_min > 0:
                     pace = round(time_min / distance, 2)
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "run", "distance": distance, "time": time_min, "pace": pace}
-                    st.session_state.progress.append(entry)
+                    st.session_state.progress_fitness.append(entry)
                     st.success(f"Logged {distance}km! Pace: {pace} min/km")
 
-        # === WALK OUTDOOR ===
+        # Walk Outdoor
         elif workout == "Walk (Outdoor)":
-            st.subheader("Outdoor Walk")
-            distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
-            time_min = st.number_input("Time (min)", min_value=0)
-            terrain = st.selectbox("Terrain", ["Flat", "Hilly", "Mixed"])
-            if st.button("Log Walk"):
+            distance = st.number_input("Distance (km)", min_value=0.0, step=0.1, key="walk_out_dist")
+            time_min = st.number_input("Time (min)", min_value=0, key="walk_out_time")
+            terrain = st.selectbox("Terrain", ["Flat", "Hilly", "Mixed"], key="walk_terrain")
+            if st.button("Log Walk", key="walk_log"):
                 if distance > 0:
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "walk_outdoor", "distance": distance, "time": time_min, "terrain": terrain}
-                    st.session_state.progress.append(entry)
+                    st.session_state.progress_fitness.append(entry)
                     st.success(f"Logged {distance}km walk!")
 
-        # === WALK TREADMILL ===
+        # Walk Treadmill
         elif workout == "Walk (Treadmill)":
-            st.subheader("Treadmill Walk")
-            speed = st.number_input("Speed (km/h)", min_value=0.0, step=0.1)
-            incline = st.number_input("Incline (%)", min_value=0.0, step=0.5)
-            time_min = st.number_input("Time (min)", min_value=0)
-            if st.button("Log"):
+            speed = st.number_input("Speed (km/h)", min_value=0.0, step=0.1, key="tread_speed")
+            incline = st.number_input("Incline (%)", min_value=0.0, step=0.5, key="tread_incline")
+            time_min = st.number_input("Time (min)", min_value=0, key="tread_time")
+            if st.button("Log Treadmill", key="tread_log"):
                 if time_min > 0:
                     distance = round(speed * (time_min / 60), 2)
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "walk_treadmill", "distance": distance, "time": time_min, "speed": speed, "incline": incline}
-                    st.session_state.progress.append(entry)
+                    st.session_state.progress_fitness.append(entry)
                     st.success(f"Logged {distance}km!")
 
-        # === CYCLE OUTDOOR ===
+        # Cycle Outdoor
         elif workout == "Cycle (Outdoor)":
-            st.subheader("Outdoor Cycle")
-            distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
-            time_min = st.number_input("Time (min)", min_value=0)
-            if st.button("Log Cycle"):
+            distance = st.number_input("Distance (km)", min_value=0.0, step=0.1, key="cycle_out_dist")
+            time_min = st.number_input("Time (min)", min_value=0, key="cycle_out_time")
+            if st.button("Log Cycle", key="cycle_out_log"):
                 if distance > 0 and time_min > 0:
                     speed = round(distance / (time_min / 60), 1)
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "cycle_outdoor", "distance": distance, "time": time_min, "avg_speed": speed}
-                    st.session_state.progress.append(entry)
+                    st.session_state.progress_fitness.append(entry)
                     st.success(f"Logged {distance}km! Speed: {speed} km/h")
 
-        # === CYCLE STATIC ===
+        # Cycle Static
         elif workout == "Cycle (Static Bike)":
-            st.subheader("Static Bike")
-            time_min = st.number_input("Time (min)", min_value=0)
-            resistance = st.slider("Resistance", 1, 20, 10)
-            rpm = st.number_input("Avg RPM", min_value=0, value=70)
-            if st.button("Log"):
+            time_min = st.number_input("Time (min)", min_value=0, key="cycle_static_time")
+            resistance = st.slider("Resistance", 1, 20, 10, key="cycle_res")
+            rpm = st.number_input("Avg RPM", min_value=0, value=70, key="cycle_rpm")
+            if st.button("Log Static Bike", key="cycle_static_log"):
                 if time_min > 0:
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "cycle_static", "time": time_min, "resistance": resistance, "rpm": rpm}
-                    st.session_state.progress.append(entry)
+                    st.session_state.progress_fitness.append(entry)
                     st.success(f"Logged {time_min} min!")
 
-    else:
-        st.session_state.part = st.selectbox("IELTS Part", ["Part 1", "Part 2", "Part 3"])
+    # === FITNESS CHARTS ===
+    if st.session_state.progress_fitness:
+        df = pd.DataFrame(st.session_state.progress_fitness)
+        df["date"] = pd.to_datetime(df["date"])
+        st.subheader("Fitness Progress")
 
-    # === EXPORT & SUMMARY ===
-    st.divider()
-    if st.session_state.progress:
-        df = pd.DataFrame(st.session_state.progress)
-        csv = df.to_csv(index=False).encode()
-        st.download_button("Export CSV", csv, "woody_progress.csv", "text/csv")
+        col1, col2 = st.columns(2)
+        with col1:
+            strength = df[df["type"].str.contains("push|pull|sit")]
+            if not strength.empty:
+                fig = px.line(strength, x="date", y="reps", color="variation", facet_col="type", markers=True)
+                st.plotly_chart(fig, use_container_width=True)
 
-        # Weekly Summary
-        week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        recent = df[df["date"] >= week_ago]
-        if not recent.empty:
-            st.info(f"**This Week:** {len(recent)} workouts logged!")
+        with col2:
+            cardio = df[df["type"].str.contains("run|walk|cycle")]
+            if not cardio.empty and "distance" in cardio.columns:
+                cardio_dist = cardio.dropna(subset=["distance"])
+                if not cardio_dist.empty:
+                    fig = px.bar(cardio_dist, x="date", y="distance", color="type", barmode="group")
+                    st.plotly_chart(fig, use_container_width=True)
 
-# === PHOTO FORM CHECK ===
-st.subheader("Upload Form Photo")
-uploaded = st.file_uploader("Push-up / Squat / Deadlift", ["jpg", "png"])
-if uploaded:
-    img = Image.open(uploaded)
-    st.image(img, width=300)
-    # Simple feedback
-    feedback = "Great form! Core tight, back straight."
-    st.success(feedback)
-    st.session_state.messages.append({"role": "assistant", "content": feedback})
+    # === FORM CHECK ===
+    st.subheader("Upload Form Photo")
+    uploaded = st.file_uploader("Push-up / Squat", ["jpg", "png"], key="form_upload")
+    if uploaded:
+        st.image(uploaded, width=300)
+        st.success("Great form! Keep core tight.")
 
-# === CHARTS (TOGGLEABLE, INTERACTIVE, MULTI-TYPE) ===
-if st.session_state.progress:
-    df = pd.DataFrame(st.session_state.progress)
-    df["date"] = pd.to_datetime(df["date"])
+    # === FITNESS CHAT ===
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-    # Main Toggle
-    show_charts = st.checkbox("Show Progress Charts", value=True)
-    if show_charts:
-        # Filters
-        st.subheader("Progress Dashboard")
-        date_filter = st.selectbox("Time Range", ["Last 7 Days", "Last 30 Days", "All Time"])
-        workout_filter = st.multiselect("Filter Workouts", df["type"].unique(), default=df["type"].unique())
+    if prompt := st.chat_input("Ask Fitness Coach..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
+                try:
+                    response = chain.invoke({"history": history, "input": prompt})
+                except:
+                    response = "Check your Groq key."
+                st.markdown(response)
+                st.session_state.messages.append({"role": "assistant", "content": response})
 
-        if date_filter == "Last 7 Days":
-            cutoff = datetime.now() - timedelta(days=7)
-        elif date_filter == "Last 30 Days":
-            cutoff = datetime.now() - timedelta(days=30)
-        else:
-            cutoff = datetime.min
-        df_filtered = df[(df["date"] >= cutoff) & (df["type"].isin(workout_filter))]
+# ========================================
+# TAB 2: NUTRITION COACH
+# ========================================
+with tab2:
+    st.title(f"{coach_name} — Nutrition Mode")
 
-        if df_filtered.empty:
-            st.info("No data in this range. Log a workout!")
-        else:
-            chart_type = st.selectbox("Chart Style", ["Line (Trends)", "Bar (Grouped)", "Scatter (Compare)", "Pie (Distribution)"])
+    # Nutrition Prompt
+    nutrition_prompt = f"""
+    You are {coach_name}, {'direct nutrition expert' if gender == 'Male (Woody)' else 'intuitive, nurturing meal guide'}.
+    Be encouraging, under 120 words. Suggest meals, recipes, macros.
+    Calorie goal: {st.session_state.calorie_goal}, Macros: {st.session_state.macro_goal}
+    History: {{history}}
+    User: {{input}}
+    {coach_name}:
+    """
+    prompt = ChatPromptTemplate.from_template(nutrition_prompt)
+    chain = prompt | llm | StrOutputParser()
 
-            col1, col2 = st.columns(2)
+    # === SIDEBAR: LOG NUTRITION ===
+    with st.sidebar:
+        st.session_state.calorie_goal = st.number_input("Daily Calories", value=st.session_state.calorie_goal, key="cal_goal")
+        st.session_state.macro_goal = {
+            "protein": st.number_input("Protein (g)", value=st.session_state.macro_goal["protein"], key="pro_goal"),
+            "carbs": st.number_input("Carbs (g)", value=st.session_state.macro_goal["carbs"], key="carb_goal"),
+            "fats": st.number_input("Fats (g)", value=st.session_state.macro_goal["fats"], key="fat_goal")
+        }
 
-            # Strength Chart
-            with col1:
-                strength = df_filtered[df_filtered["type"].str.contains("push|pull|sit", case=False)]
-                if not strength.empty and "reps" in strength.columns:
-                    if chart_type == "Line (Trends)":
-                        fig = px.line(strength, x="date", y="reps", color="variation", facet_col="type", markers=True, title="Strength Progress")
-                    elif chart_type == "Bar (Grouped)":
-                        fig = px.bar(strength, x="date", y="reps", color="variation", barmode="group", title="Strength by Date")
-                    elif chart_type == "Scatter (Compare)":
-                        fig = px.scatter(strength, x="date", y="reps", color="variation", size="reps", title="Strength Scatter")
-                    else:  # Pie
-                        fig = px.pie(strength, names="variation", values="reps", title="Strength Distribution")
-
-                    fig.update_layout(height=400, showlegend=True)
-                    config = {"displayModeBar": True, "scrollZoom": False}  # Smooth zoom, no scroll conflict
-                    st.plotly_chart(fig, use_container_width=True, config=config)
-                else:
-                    st.write("No strength data.")
-
-            # Cardio Chart
-            with col2:
-                cardio = df_filtered[df_filtered["type"].str.contains("run|walk|cycle")]
-                if not cardio.empty:
-                    cardio_dist = cardio.dropna(subset=["distance"]) if "distance" in cardio.columns else pd.DataFrame()
-                    if not cardio_dist.empty:
-                        if chart_type == "Line (Trends)":
-                            fig = px.line(cardio_dist, x="date", y="distance", color="type", markers=True, title="Cardio Distance")
-                        elif chart_type == "Bar (Grouped)":
-                            fig = px.bar(cardio_dist, x="date", y="distance", color="type", barmode="group", title="Cardio by Date")
-                        elif chart_type == "Scatter (Compare)":
-                            fig = px.scatter(cardio_dist, x="date", y="distance", color="type", size="time", title="Cardio Scatter")
-                        else:  # Pie
-                            fig = px.pie(cardio_dist, names="type", values="distance", title="Cardio Distribution")
-
-                        # Safe hover
-                        hover_cols = [c for c in ["time", "pace", "avg_speed", "speed", "incline"] if c in cardio_dist.columns]
-                        fig.update_traces(hovertemplate="<b>%{fullData.name}</b><br>Date: %{x}<br>Distance: %{y}km<extra></extra>" + "".join([f"<br>{c}: %{{{c}}}" for c in hover_cols]))
-
-                        fig.update_layout(height=400, showlegend=True)
-                        config = {"displayModeBar": True, "scrollZoom": False}
-                        st.plotly_chart(fig, use_container_width=True, config=config)
-                    else:
-                        st.write("No distance-based cardio.")
-                else:
-                    st.write("No cardio data.")
-    else:
-        st.info("Charts hidden. Toggle to view your progress!")
-
-# === PERSONAL BESTS ===
-if st.session_state.progress:
-    df = pd.DataFrame(st.session_state.progress)
-    pbs = []
-    for t in ["push_ups", "pull_ups", "sit_ups"]:
-        subset = df[df["type"] == t]
-        if not subset.empty:
-            pb = subset["reps"].max()
-            pbs.append(f"{t.replace('_', ' ').title()}: {pb}")
-    if pbs:
-        st.success("**Personal Bests:** " + " | ".join(pbs))
-
-# === CHAT ===
-st.title(f"Coach Woody — {mode.split()[0]} Mode")
-
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-if prompt := st.chat_input(f"Ask {mode.split()[0]} Woody..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
-            kwargs = {
-                "level": st.session_state.level,
-                "goal": st.session_state.goal,
-                "history": history,
-                "input": prompt
+        meal = st.selectbox("Log Meal", ["Breakfast", "Lunch", "Dinner", "Snack"], key="meal_type")
+        calories = st.number_input("Calories", min_value=0, value=0, key="meal_cal")
+        protein = st.number_input("Protein (g)", min_value=0, value=0, key="meal_pro")
+        carbs = st.number_input("Carbs (g)", min_value=0, value=0, key="meal_carb")
+        fats = st.number_input("Fats (g)", min_value=0, value=0, key="meal_fat")
+        if st.button("Log Meal", key="log_meal"):
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "type": meal.lower(),
+                "calories": calories,
+                "protein": protein,
+                "carbs": carbs,
+                "fats": fats
             }
-            if mode == "IELTS Speaking Coach":
-                kwargs["part"] = st.session_state.part
-            try:
-                response = chain.invoke(kwargs)
-            except:
-                response = "Oops! Check your Groq key in secrets."
-        st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+            st.session_state.progress_nutrition.append(entry)
+            st.success(f"Logged {meal}: {calories} cal")
+
+    # === NUTRITION CHARTS ===
+    if st.session_state.progress_nutrition:
+        df = pd.DataFrame(st.session_state.progress_nutrition)
+        df["date"] = pd.to_datetime(df["date"])
+        st.subheader("Nutrition Progress")
+
+        # Daily Totals
+        today = df[df["date"].dt.date == datetime.now().date()]
+        if not today.empty:
+            total = today[["calories", "protein", "carbs", "fats"]].sum()
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Calories", int(total["calories"]), st.session_state.calorie_goal)
+            col2.metric("Protein", int(total["protein"]), st.session_state.macro_goal["protein"])
+            col3.metric("Carbs", int(total["carbs"]), st.session_state.macro_goal["carbs"])
+            col4.metric("Fats", int(total["fats"]), st.session_state.macro_goal["fats"])
+
+        # Macro Chart
+        fig = px.bar(df, x="date", y=["protein", "carbs", "fats"], title="Daily Macros (g)")
+        st.plotly_chart(fig, use_container_width=True)
+
+    # === NUTRITION CHAT ===
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    if prompt := st.chat_input("Ask Nutrition Coach..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
+                try:
+                    response = chain.invoke({"history": history, "input": prompt})
+                except:
+                    response = "Check your Groq key."
+                st.markdown(response)
+                st.session_state.messages.append({"role": "assistant", "content": response})

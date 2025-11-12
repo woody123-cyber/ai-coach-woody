@@ -4,11 +4,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import plotly.express as px
 import pandas as pd
-from datetime import datetime
-import re
-import json
+from datetime import datetime, date
 import os
+import json
 from groq import GroqError
+import random
 
 # === CONFIG ===
 st.set_page_config(page_title="Coach Woody", page_icon="trophy", layout="wide")
@@ -38,15 +38,13 @@ def load_user_data():
     try:
         with open(DATA_FILE, "r") as f:
             data = json.load(f)
-            # Validate expected keys and types
             expected_keys = {
                 "messages": list, "level": int, "xp": int, "total_xp": int,
-                "last_band": float, "streak": int, "progress_fitness": list,
-                "progress_nutrition": list, "name": str, "body_weight_kg": float,
-                "weight_unit": str, "weight_goal": str, "calorie_goal": int,
-                "macro_goal": dict, "home_lang": str, "part": str,
-                "fitness_starters": list, "nutrition_starters": list,
-                "question_history": list, "onboarded": bool, "quick_prompt": (str, type(None))
+                "progress_fitness": list, "progress_nutrition": list, "name": str,
+                "body_weight_kg": float, "weight_unit": str, "weight_goal": str,
+                "calorie_goal": int, "macro_goal": dict, "fitness_starters": list,
+                "nutrition_starters": list, "onboarded": bool, "quick_prompt": (str, type(None)),
+                "xp_history": list, "daily_quests": dict, "last_quest_date": str
             }
             valid_data = {}
             for key, expected_type in expected_keys.items():
@@ -66,13 +64,11 @@ def load_user_data():
         return {}
 
 def save_user_data():
-    # Only save relevant session state keys
     keys_to_save = [
-        "messages", "level", "xp", "total_xp", "last_band", "streak",
-        "progress_fitness", "progress_nutrition", "name", "body_weight_kg",
-        "weight_unit", "weight_goal", "calorie_goal", "macro_goal",
-        "home_lang", "part", "fitness_starters", "nutrition_starters",
-        "question_history", "onboarded", "quick_prompt"
+        "messages", "level", "xp", "total_xp", "progress_fitness", "progress_nutrition",
+        "name", "body_weight_kg", "weight_unit", "weight_goal", "calorie_goal",
+        "macro_goal", "fitness_starters", "nutrition_starters", "onboarded",
+        "quick_prompt", "xp_history", "daily_quests", "last_quest_date"
     ]
     data = {k: st.session_state.get(k) for k in keys_to_save if k in st.session_state}
     try:
@@ -82,6 +78,33 @@ def save_user_data():
         with open("error_log.txt", "a") as f:
             f.write(f"{datetime.now()}: Error saving user_data.json: {str(e)}\n")
 
+# === DAILY QUESTS ===
+# New: Quest pool with fitness tasks
+quest_pool = [
+    {"task": "Do 20 push-ups", "xp": 10, "type": "push_ups", "reps": 20},
+    {"task": "Complete 15 squats", "xp": 10, "type": "squats", "reps": 15},
+    {"task": "Run 3 km", "xp": 15, "type": "run", "distance": 3},
+    {"task": "Walk 5 km", "xp": 12, "type": "walk_outdoor", "distance": 5},
+    {"task": "Hold a 1-minute plank", "xp": 10, "type": "plank", "time_min": 1},
+    {"task": "Do 10 pull-ups", "xp": 15, "type": "pull_ups", "reps": 10},
+    {"task": "Cycle 10 km", "xp": 15, "type": "cycle_outdoor", "distance": 10},
+    {"task": "Perform 20 sit-ups", "xp": 10, "type": "sit_ups", "reps": 20},
+    {"task": "Stretch for 10 minutes", "xp": 10, "type": "stretch", "time_min": 10},
+    {"task": "Complete a 20-minute HIIT session", "xp": 20, "type": "hiit", "time_min": 20}
+]
+
+def reset_daily_quests():
+    today = date.today().strftime("%Y-%m-%d")
+    if st.session_state.get("last_quest_date") != today:
+        selected_quests = random.sample(quest_pool, 5)
+        st.session_state.daily_quests = {
+            i: {"task": q["task"], "xp": q["xp"], "completed": False, "type": q["type"],
+                "reps": q.get("reps", 0), "distance": q.get("distance", 0), "time_min": q.get("time_min", 0)}
+            for i, q in enumerate(selected_quests)
+        }
+        st.session_state.last_quest_date = today
+        save_user_data()
+
 # Initialize session state
 if "initialized" not in st.session_state:
     user_data = load_user_data()
@@ -90,8 +113,6 @@ if "initialized" not in st.session_state:
         "level": 1,
         "xp": 0,
         "total_xp": 0,
-        "last_band": 0.0,
-        "streak": 0,
         "progress_fitness": [],
         "progress_nutrition": [],
         "name": "",
@@ -100,8 +121,6 @@ if "initialized" not in st.session_state:
         "weight_goal": "Maintain",
         "calorie_goal": 2000,
         "macro_goal": {"protein": 150, "carbs": 250, "fats": 70},
-        "home_lang": "English",
-        "part": "Part 1",
         "fitness_starters": [
             "How do I improve my push-up form?",
             "What's a good 5K training plan?",
@@ -113,9 +132,11 @@ if "initialized" not in st.session_state:
             "Suggest a high-protein meal under 500 cal.",
             "How do I lose weight quickly?"
         ],
-        "question_history": [],
         "onboarded": False,
-        "quick_prompt": None
+        "quick_prompt": None,
+        "xp_history": [],
+        "daily_quests": {},
+        "last_quest_date": ""
     }
     for key, value in defaults.items():
         try:
@@ -125,7 +146,11 @@ if "initialized" not in st.session_state:
                 f.write(f"{datetime.now()}: AttributeError for key {key}: {str(e)}\n")
             st.session_state[key] = value
     st.session_state["initialized"] = True
+    reset_daily_quests()  # Initialize quests
     save_user_data()
+
+# Reset quests if new day
+reset_daily_quests()
 
 # === ONBOARDING ===
 if not st.session_state.get("onboarded", False):
@@ -135,7 +160,7 @@ if not st.session_state.get("onboarded", False):
         Coach Woody helps you:  
         - 🏋️ Log workouts and get fitness tips  
         - 🥗 Track meals and macros  
-        - 🗣️ Practice IELTS Speaking with a 60-level quest  
+        - 🏆 Complete daily fitness quests for extra XP  
         Start by setting your name and body stats in the sidebar. Choose a tab to begin!  
         """)
         if st.button("Got it!"):
@@ -188,29 +213,104 @@ with st.sidebar:
     col1.metric("Protein", f"{st.session_state.macro_goal['protein']}g")
     col2.metric("Carbs", f"{st.session_state.macro_goal['carbs']}g")
     col3.metric("Fats", f"{st.session_state.macro_goal['fats']}g")
+    # New: Daily Quests Section
+    st.divider()
+    st.subheader("Daily Quests")
+    st.info("Complete 5 fitness quests daily for XP! Resets at midnight.")
+    quest_progress = sum(1 for q in st.session_state.daily_quests.values() if q["completed"])
+    st.metric("Quests Completed", f"{quest_progress}/5")
+    for i, quest in st.session_state.daily_quests.items():
+        completed = st.checkbox(f"{quest['task']} (+{quest['xp']} XP)", value=quest["completed"], key=f"quest_{i}")
+        if completed and not quest["completed"]:
+            quest["completed"] = True
+            st.session_state.xp += quest["xp"]
+            st.session_state.total_xp += quest["xp"]
+            st.session_state.xp_history.append({
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "source": f"Quest: {quest['task']}",
+                "xp": quest["xp"]
+            })
+            # Log to progress_fitness
+            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": quest["type"], "intensity": "Medium"}
+            if quest["reps"] > 0:
+                entry["reps"] = quest["reps"]
+                entry["variation"] = "Standard"
+            if quest["distance"] > 0:
+                entry["distance"] = quest["distance"]
+                entry["time"] = 0
+            if quest["time_min"] > 0:
+                entry["time"] = quest["time_min"]
+            st.session_state.progress_fitness.append(entry)
+            save_user_data()
+            st.success(f"Quest '{quest['task']}' completed! +{quest['xp']} XP")
+    if quest_progress == 5 and not st.session_state.get("all_quests_bonus", False):
+        st.session_state.xp += 50
+        st.session_state.total_xp += 50
+        st.session_state.xp_history.append({
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "source": "All Quests Bonus",
+            "xp": 50
+        })
+        st.session_state.all_quests_bonus = True
+        save_user_data()
+        st.balloons()
+        st.success("All quests completed! +50 XP Bonus!")
 
 # === XP SYSTEM ===
-def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0):
-    xp_gain = 5
+def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Medium"):
+    xp_gain = 10
+    intensity_multipliers = {"Low": 1.0, "Medium": 1.5, "High": 2.0}
+    xp_gain *= intensity_multipliers[intensity]
     if workout_type in ["push_ups", "pull_ups", "sit_ups"]:
-        xp_gain += reps // 10
+        xp_gain += reps // 5
     elif workout_type in ["run", "walk_outdoor", "cycle_outdoor"]:
-        xp_gain += int(distance * 2)
+        xp_gain += int(distance * 3)
     elif workout_type in ["walk_treadmill", "cycle_static"]:
-        xp_gain += time_min // 10
+        xp_gain += time_min // 5
+    df = pd.DataFrame(st.session_state.progress_fitness)
+    if not df.empty:
+        df["date"] = pd.to_datetime(df["date"])
+        week_start = datetime.now() - pd.Timedelta(days=datetime.now().weekday())
+        week_logs = df[df["date"] >= week_start]
+        unique_days = len(week_logs["date"].dt.date.unique())
+        if unique_days >= 3:
+            xp_gain += 50
     st.session_state.xp += xp_gain
     st.session_state.total_xp += xp_gain
+    st.session_state.xp_history.append({
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "source": f"{workout_type} ({intensity})",
+        "xp": xp_gain
+    })
     check_level_up()
     return xp_gain
 
 def award_nutrition_xp(calories, protein, carbs, fats):
-    xp_gain = 5
-    if (abs(protein - st.session_state.macro_goal["protein"]) <= 0.1 * st.session_state.macro_goal["protein"] and
-        abs(carbs - st.session_state.macro_goal["carbs"]) <= 0.1 * st.session_state.macro_goal["carbs"] and
-        abs(fats - st.session_state.macro_goal["fats"]) <= 0.1 * st.session_state.macro_goal["fats"]):
-        xp_gain += 10
+    xp_gain = 10
+    if calories > 0:
+        protein_diff = abs(protein - st.session_state.macro_goal["protein"]) / st.session_state.macro_goal["protein"]
+        carbs_diff = abs(carbs - st.session_state.macro_goal["carbs"]) / st.session_state.macro_goal["carbs"]
+        fats_diff = abs(fats - st.session_state.macro_goal["fats"]) / st.session_state.macro_goal["fats"]
+        balance_score = max(0, 100 - (protein_diff + carbs_diff + fats_diff) * 100 / 3)
+        xp_gain += int(balance_score * 0.15)
+    df = pd.DataFrame(st.session_state.progress_nutrition)
+    if not df.empty:
+        df["date"] = pd.to_datetime(df["date"])
+        last_7_days = df[df["date"] >= datetime.now() - pd.Timedelta(days=7)]
+        daily_totals = last_7_days.groupby(last_7_days["date"].dt.date)["calories"].sum()
+        goal_hits = sum(1 for c in daily_totals if abs(c - st.session_state.calorie_goal) <= 0.1 * st.session_state.calorie_goal)
+        if goal_hits >= 3:
+            xp_gain += 20
+        today = df[df["date"].dt.date == datetime.now().date()]
+        if len(today) >= 3:
+            xp_gain += 10
     st.session_state.xp += xp_gain
     st.session_state.total_xp += xp_gain
+    st.session_state.xp_history.append({
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "source": "Meal Log (Balance Score: {:.0f}%)".format(balance_score) if calories > 0 else "Meal Log",
+        "xp": xp_gain
+    })
     check_level_up()
     return xp_gain
 
@@ -242,7 +342,7 @@ def chain_invoke(chain, history, user_input):
         return "Unexpected error. Please try again."
 
 # === TABS ===
-tab1, tab2, tab3 = st.tabs(["Fitness Coach", "Nutrition Coach", "Speaking Quest"])
+tab1, tab2 = st.tabs(["Fitness Coach", "Nutrition Coach"])
 
 # ========================================
 # TAB 1: FITNESS COACH
@@ -260,46 +360,57 @@ with tab1:
     prompt = ChatPromptTemplate.from_template(fitness_prompt)
     chain = prompt | llm | StrOutputParser()
     workout = st.selectbox("Log Workout", [
-        "Push-ups", "Pull-ups", "Sit-ups",
-        "Run", "Walk (Outdoor)", "Walk (Treadmill)",
-        "Cycle (Outdoor)", "Cycle (Static Bike)"
+        "Push-ups", "Pull-ups", "Sit-ups", "Squats", "Plank", "Run",
+        "Walk (Outdoor)", "Walk (Treadmill)", "Cycle (Outdoor)", "Cycle (Static Bike)",
+        "Stretch", "HIIT"
     ])
-    if workout in ["Push-ups", "Pull-ups", "Sit-ups"]:
+    intensity = st.selectbox("Intensity", ["Low", "Medium", "High"])
+    if workout in ["Push-ups", "Pull-ups", "Sit-ups", "Squats"]:
         variations = {
             "Push-ups": ["Normal", "Close-Grip", "Wide-Grip"],
             "Pull-ups": ["Normal", "Chin-ups", "Neutral-Grip"],
-            "Sit-ups": ["Standard", "Russian Twists", "Leg Raises"]
+            "Sit-ups": ["Standard", "Russian Twists", "Leg Raises"],
+            "Squats": ["Bodyweight", "Goblet", "Sumo"]
         }
         variation = st.selectbox("Variation", variations[workout])
         reps = st.number_input("Reps", min_value=0, value=0)
         if st.button("Log Workout"):
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": workout.lower().replace("-", "_"), "variation": variation, "reps": reps}
+            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": workout.lower().replace("-", "_"), "variation": variation, "reps": reps, "intensity": intensity}
             st.session_state.progress_fitness.append(entry)
-            xp_gain = award_fitness_xp(workout.lower().replace("-", "_"), reps=reps)
+            xp_gain = award_fitness_xp(workout.lower().replace("-", "_"), reps=reps, intensity=intensity)
             save_user_data()
-            st.success(f"Logged {reps} {variation} {workout.lower()}! +{xp_gain} XP")
+            st.success(f"Logged {reps} {variation} {workout.lower()} ({intensity})! +{xp_gain} XP")
+    elif workout == "Plank":
+        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
+        if st.button("Log Plank"):
+            if time_min > 0:
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "plank", "time": time_min, "intensity": intensity}
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("plank", time_min=time_min, intensity=intensity)
+                save_user_data()
+                st.success(f"Logged {time_min} min plank ({intensity})! +{xp_gain} XP")
     elif workout == "Run":
         distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
         time_min = st.number_input("Time (min)", min_value=0)
         if st.button("Log Run"):
             if distance > 0 and time_min > 0:
                 pace = round(time_min / distance, 2)
-                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "run", "distance": distance, "time": time_min, "pace": pace}
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "run", "distance": distance, "time": time_min, "pace": pace, "intensity": intensity}
                 st.session_state.progress_fitness.append(entry)
-                xp_gain = award_fitness_xp("run", distance=distance)
+                xp_gain = award_fitness_xp("run", distance=distance, time_min=time_min, intensity=intensity)
                 save_user_data()
-                st.success(f"Logged {distance}km! Pace: {pace} min/km! +{xp_gain} XP")
+                st.success(f"Logged {distance}km run ({intensity})! Pace: {pace} min/km! +{xp_gain} XP")
     elif workout == "Walk (Outdoor)":
         distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
         time_min = st.number_input("Time (min)", min_value=0)
         terrain = st.selectbox("Terrain", ["Flat", "Hilly", "Mixed"])
         if st.button("Log Walk"):
             if distance > 0:
-                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "walk_outdoor", "distance": distance, "time": time_min, "terrain": terrain}
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "walk_outdoor", "distance": distance, "time": time_min, "terrain": terrain, "intensity": intensity}
                 st.session_state.progress_fitness.append(entry)
-                xp_gain = award_fitness_xp("walk_outdoor", distance=distance)
+                xp_gain = award_fitness_xp("walk_outdoor", distance=distance, time_min=time_min, intensity=intensity)
                 save_user_data()
-                st.success(f"Logged {distance}km walk! +{xp_gain} XP")
+                st.success(f"Logged {distance}km walk ({intensity})! +{xp_gain} XP")
     elif workout == "Walk (Treadmill)":
         speed = st.number_input("Speed (km/h)", min_value=0.0, step=0.1)
         incline = st.number_input("Incline (%)", min_value=0.0, step=0.5)
@@ -307,33 +418,51 @@ with tab1:
         if st.button("Log Treadmill"):
             if time_min > 0:
                 distance = round(speed * (time_min / 60), 2)
-                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "walk_treadmill", "distance": distance, "time": time_min, "speed": speed, "incline": incline}
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "walk_treadmill", "distance": distance, "time": time_min, "speed": speed, "incline": incline, "intensity": intensity}
                 st.session_state.progress_fitness.append(entry)
-                xp_gain = award_fitness_xp("walk_treadmill", time_min=time_min)
+                xp_gain = award_fitness_xp("walk_treadmill", time_min=time_min, intensity=intensity)
                 save_user_data()
-                st.success(f"Logged {distance}km! +{xp_gain} XP")
+                st.success(f"Logged {distance}km treadmill ({intensity})! +{xp_gain} XP")
     elif workout == "Cycle (Outdoor)":
         distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
         time_min = st.number_input("Time (min)", min_value=0)
         if st.button("Log Cycle"):
             if distance > 0 and time_min > 0:
                 speed = round(distance / (time_min / 60), 1)
-                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "cycle_outdoor", "distance": distance, "time": time_min, "avg_speed": speed}
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "cycle_outdoor", "distance": distance, "time": time_min, "avg_speed": speed, "intensity": intensity}
                 st.session_state.progress_fitness.append(entry)
-                xp_gain = award_fitness_xp("cycle_outdoor", distance=distance)
+                xp_gain = award_fitness_xp("cycle_outdoor", distance=distance, time_min=time_min, intensity=intensity)
                 save_user_data()
-                st.success(f"Logged {distance}km! Speed: {speed} km/h! +{xp_gain} XP")
+                st.success(f"Logged {distance}km cycle ({intensity})! Speed: {speed} km/h! +{xp_gain} XP")
     elif workout == "Cycle (Static Bike)":
         time_min = st.number_input("Time (min)", min_value=0)
         resistance = st.slider("Resistance", 1, 20, 10)
         rpm = st.number_input("Avg RPM", min_value=0, value=70)
         if st.button("Log Static Bike"):
             if time_min > 0:
-                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "cycle_static", "time": time_min, "resistance": resistance, "rpm": rpm}
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "cycle_static", "time": time_min, "resistance": resistance, "rpm": rpm, "intensity": intensity}
                 st.session_state.progress_fitness.append(entry)
-                xp_gain = award_fitness_xp("cycle_static", time_min=time_min)
+                xp_gain = award_fitness_xp("cycle_static", time_min=time_min, intensity=intensity)
                 save_user_data()
-                st.success(f"Logged {time_min} min! +{xp_gain} XP")
+                st.success(f"Logged {time_min} min static bike ({intensity})! +{xp_gain} XP")
+    elif workout == "Stretch":
+        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
+        if st.button("Log Stretch"):
+            if time_min > 0:
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "stretch", "time": time_min, "intensity": intensity}
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("stretch", time_min=time_min, intensity=intensity)
+                save_user_data()
+                st.success(f"Logged {time_min} min stretch ({intensity})! +{xp_gain} XP")
+    elif workout == "HIIT":
+        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
+        if st.button("Log HIIT"):
+            if time_min > 0:
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "hiit", "time": time_min, "intensity": intensity}
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("hiit", time_min=time_min, intensity=intensity)
+                save_user_data()
+                st.success(f"Logged {time_min} min HIIT ({intensity})! +{xp_gain} XP")
     if st.session_state.progress_fitness:
         df = pd.DataFrame(st.session_state.progress_fitness)
         df["date"] = pd.to_datetime(df["date"])
@@ -341,19 +470,29 @@ with tab1:
         st.subheader("Fitness Progress")
         col1, col2 = st.columns(2)
         with col1:
-            strength = df[df["type"].str.contains("push|pull|sit")]
+            strength = df[df["type"].str.contains("push|pull|sit|squat")]
             if not strength.empty:
                 fig = px.line(strength, x="date", y="reps", color="variation", facet_col="type", markers=True)
                 fig.update_layout(font=dict(size=14))
                 st.plotly_chart(fig, use_container_width=True)
         with col2:
-            cardio = df[df["type"].str.contains("run|walk|cycle")]
+            cardio = df[df["type"].str.contains("run|walk|cycle|plank|stretch|hiit")]
             if not cardio.empty and "distance" in cardio.columns:
                 cardio_dist = cardio.dropna(subset=["distance"])
                 if not cardio_dist.empty:
                     fig = px.bar(cardio_dist, x="date", y="distance", color="type", barmode="group")
                     fig.update_layout(font=dict(size=14))
                     st.plotly_chart(fig, use_container_width=True)
+    if st.session_state.xp_history:
+        st.subheader("Progress Summary")
+        xp_df = pd.DataFrame(st.session_state.xp_history)
+        xp_df["date"] = pd.to_datetime(xp_df["date"])
+        xp_df = xp_df[xp_df["date"] >= datetime.now() - pd.Timedelta(days=30)]
+        fig = px.bar(xp_df, x="date", y="xp", color="source", title="XP Gains Over Time")
+        fig.update_layout(font=dict(size=14))
+        st.plotly_chart(fig, use_container_width=True)
+        with st.expander("XP History"):
+            st.dataframe(xp_df[["date", "source", "xp"]], use_container_width=True)
     st.subheader("Form Check")
     st.info("Describe your form — I’ll give feedback!")
     st.subheader("Quick Start")
@@ -401,8 +540,14 @@ with tab2:
         entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": meal.lower(), "calories": calories, "protein": protein, "carbs": carbs, "fats": fats}
         st.session_state.progress_nutrition.append(entry)
         xp_gain = award_nutrition_xp(calories, protein, carbs, fats)
+        balance_score = 100
+        if calories > 0:
+            protein_diff = abs(protein - st.session_state.macro_goal["protein"]) / st.session_state.macro_goal["protein"]
+            carbs_diff = abs(carbs - st.session_state.macro_goal["carbs"]) / st.session_state.macro_goal["carbs"]
+            fats_diff = abs(fats - st.session_state.macro_goal["fats"]) / st.session_state.macro_goal["fats"]
+            balance_score = max(0, 100 - (protein_diff + carbs_diff + fats_diff) * 100 / 3)
         save_user_data()
-        st.success(f"Logged {meal}: {calories} cal! +{xp_gain} XP")
+        st.success(f"Logged {meal}: {calories} cal (Balance: {balance_score:.0f}%)! +{xp_gain} XP")
     if st.session_state.progress_nutrition:
         df = pd.DataFrame(st.session_state.progress_nutrition)
         df["date"] = pd.to_datetime(df["date"])
@@ -439,6 +584,16 @@ with tab2:
         fig.update_traces(line=dict(color="#ff7f0e", dash="dash"), selector=dict(name="goal"))
         fig.update_layout(font=dict(size=14))
         st.plotly_chart(fig, use_container_width=True)
+    if st.session_state.xp_history:
+        st.subheader("Progress Summary")
+        xp_df = pd.DataFrame(st.session_state.xp_history)
+        xp_df["date"] = pd.to_datetime(xp_df["date"])
+        xp_df = xp_df[xp_df["date"] >= datetime.now() - pd.Timedelta(days=30)]
+        fig = px.bar(xp_df, x="date", y="xp", color="source", title="XP Gains Over Time")
+        fig.update_layout(font=dict(size=14))
+        st.plotly_chart(fig, use_container_width=True)
+        with st.expander("XP History"):
+            st.dataframe(xp_df[["date", "source", "xp"]], use_container_width=True)
     st.subheader("Quick Start")
     cols = st.columns(4)
     for i, starter in enumerate(st.session_state.nutrition_starters):
@@ -459,148 +614,3 @@ with tab2:
                 st.markdown(response)
                 st.session_state.messages.append({"role": "assistant", "content": response})
                 save_user_data()
-
-# ========================================
-# TAB 3: 60-LEVEL IELTS SPEAKING QUEST
-# ========================================
-with tab3:
-    st.title(f"{coach_name} — IELTS Speaking Quest")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Level", st.session_state.level)
-    col2.metric("XP", f"{st.session_state.xp}/100")
-    col3.metric("Streak", f"{st.session_state.streak} days")
-    progress = min(st.session_state.xp / 100, 1.0)
-    st.progress(progress)
-    st.caption(f"**Band {st.session_state.last_band:.1f}** → Next Level: {st.session_state.level + 1}")
-    languages = {
-        "English": "English", "中文": "Chinese", "Español": "Spanish", "हिन्दी": "Hindi",
-        "العربية": "Arabic", "Português": "Portuguese", "বাংলা": "Bengali", "Русский": "Russian",
-        "日本語": "Japanese", "Deutsch": "German", "Français": "French", "한국어": "Korean"
-    }
-    st.session_state.home_lang = st.selectbox(
-        "Home Language", options=list(languages.keys()),
-        format_func=lambda x: f"{x} ({languages[x]})",
-        index=list(languages.keys()).index(st.session_state.home_lang) if st.session_state.home_lang in languages else 0
-    )
-    native_lang = languages[st.session_state.home_lang]
-    st.session_state.part = st.selectbox("IELTS Part", ["Part 1", "Part 2", "Part 3"])
-    questions = {
-        "Part 1": {
-            1: ["Tell me about your name.", "Do you work or study?"],
-            10: ["What do you do in your free time?", "Do you like your hometown?"],
-            30: ["How has technology changed daily life?", "Should students wear uniforms?"],
-            50: ["How does advertising affect consumer behavior?", "Is climate change the biggest global challenge?"]
-        },
-        "Part 2": {
-            1: "Describe your favorite food.",
-            10: "Describe a person you admire.",
-            30: "Describe a time you helped someone.",
-            50: "Describe a law that should be changed."
-        },
-        "Part 3": {
-            1: "Do you like food?",
-            10: "Why do people admire others?",
-            30: "How important is helping others in society?",
-            50: "Should governments prioritize economic growth over environmental protection?"
-        }
-    }
-    def get_question(part, level):
-        bank = questions[part]
-        if level <= 10:
-            return bank[1][0] if part == "Part 1" else bank[1]
-        elif level <= 30:
-            return bank[10][0] if part == "Part 1" else bank[10]
-        elif level <= 50:
-            return bank[30][0] if part == "Part 1" else bank[30]
-        else:
-            return bank[50][0] if part == "Part 1" else bank[50]
-    current_q = get_question(st.session_state.part, st.session_state.level)
-    practice_mode = st.checkbox("Practice Mode (No Scoring)")
-    st.write(f"**{'Practice ' if practice_mode else ''}Question:** {current_q}")
-    def award_xp(band_score):
-        xp_gain = 0
-        if band_score >= 8.5:
-            xp_gain = 25
-        elif band_score >= 7.5:
-            xp_gain = 18
-        elif band_score >= 6.5:
-            xp_gain = 12
-        elif band_score >= 5.5:
-            xp_gain = 8
-        elif band_score >= 4.5:
-            xp_gain = 5
-        else:
-            xp_gain = 2
-        if st.session_state.streak > 3:
-            xp_gain = int(xp_gain * 1.5)
-        st.session_state.xp += xp_gain
-        st.session_state.total_xp += xp_gain
-        st.session_state.last_band = band_score
-        check_level_up()
-        if st.session_state.level >= 60:
-            st.success("**IELTS 9.0 READY! YOU ARE A MASTER!**")
-            st.balloons()
-        return xp_gain
-    speaking_prompt = f"""
-    You are {coach_name}, a strict but fair IELTS Speaking examiner.
-    User is at **Level {st.session_state.level}** (Band ~{min(9.0, st.session_state.level / 10):.1f}).
-    Question: {current_q}
-    User home language: {native_lang}
-    INSTRUCTIONS:
-    1. Ask the question in {native_lang}.
-    2. After user answers (in English):
-       - Give **Band Score** (0.5 increments, 1.0–9.0)
-       - 1 **Strength**
-       - 1 **Improvement**
-       - **Example Answer** (Band 8.5+)
-    3. Be **stricter at higher levels** (Level 50+ = expect near-native).
-    4. Keep under 180 words.
-    History: {{history}}
-    User: {{input}}
-    {coach_name}:
-    """
-    prompt = ChatPromptTemplate.from_template(speaking_prompt)
-    chain = prompt | llm | StrOutputParser()
-    starters = ["Start speaking practice", "Give me a harder question", "How do I reach Level 60?"]
-    st.subheader("Quick Start")
-    cols = st.columns(3)
-    for i, s in enumerate(starters):
-        if cols[i].button(s, key=f"qs_{i}"):
-            st.session_state.quick_prompt = s
-    user_prompt = st.chat_input("Speak your answer...", key="ielts_chat")
-    if st.session_state.quick_prompt:
-        user_prompt = st.session_state.quick_prompt
-        st.session_state.quick_prompt = None
-    if user_prompt:
-        st.session_state.messages.append({"role": "user", "content": user_prompt})
-        with st.chat_message("user"):
-            st.markdown(user_prompt)
-        with st.chat_message("assistant"):
-            with st.spinner("Scoring..."):
-                history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
-                response = chain_invoke(chain, history, user_prompt)
-                if not practice_mode:
-                    band_match = re.search(r"Band[\s:]*([0-9]\.[0-9])", response)
-                    band = float(band_match.group(1)) if band_match else 0.0
-                    xp_gain = award_xp(band)
-                    response += f"\n**+{xp_gain} XP**"
-                st.session_state.question_history.append({
-                    "date": datetime.now().strftime("%Y-%m-%d"),
-                    "question": current_q,
-                    "answer": user_prompt,
-                    "band": band if not practice_mode else None
-                })
-                st.markdown(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                save_user_data()
-    with st.expander("Past Questions"):
-        if st.session_state.question_history:
-            df = pd.DataFrame(st.session_state.question_history)
-            st.dataframe(df[["date", "question", "band"]], use_container_width=True)
-    if st.session_state.question_history:
-        df = pd.DataFrame(st.session_state.question_history)
-        df = df[df["band"].notnull()]
-        if not df.empty:
-            fig = px.line(df, x="date", y="band", title="Band Score Progress", markers=True)
-            fig.update_layout(font=dict(size=14))
-            st.plotly_chart(fig, use_container_width=True)

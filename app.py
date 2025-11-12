@@ -275,17 +275,32 @@ def check_level_up():
 
 # New: Skill XP Award Function
 def award_skill_xp(skill_type, amount):
-    if skill_type in st.session_state.skill_levels:
-        skill = st.session_state.skill_levels[skill_type]
-        skill["xp"] += amount
-        required_skill_xp = 100 + 50 * (skill["level"] - 1)
-        while skill["xp"] >= required_skill_xp and skill["level"] < 60:
-            skill["xp"] -= required_skill_xp
-            skill["level"] += 1
+    if skill_type not in st.session_state.skill_levels:
+        st.session_state.skill_levels[skill_type] = {"level": 1, "xp": 0}
+        with open("error_log.txt", "a") as f:
+            f.write(f"{datetime.now()}: Initialized missing skill {skill_type}\n")
+    try:
+        xp_gain = int(amount)
+        if xp_gain < 0:
+            raise ValueError("XP amount cannot be negative")
+        current_xp = st.session_state.skill_levels[skill_type]["xp"]
+        current_level = st.session_state.skill_levels[skill_type]["level"]
+        new_xp = current_xp + xp_gain
+        required_skill_xp = 100 + 50 * (current_level - 1)
+        while new_xp >= required_skill_xp and current_level < 60:
+            new_xp -= required_skill_xp
+            current_level += 1
             st.balloons()
-            st.success(f"**{skill_type.replace('_', ' ').title()} SKILL LEVEL UP! → Level {skill['level']}**")
-            required_skill_xp = 100 + 50 * (skill["level"] - 1)
+            st.success(f"**{skill_type.replace('_', ' ').title()} SKILL LEVEL UP! → Level {current_level}**")
+            required_skill_xp = 100 + 50 * (current_level - 1)
+        st.session_state.skill_levels[skill_type]["xp"] = new_xp
+        st.session_state.skill_levels[skill_type]["level"] = current_level
         save_user_data()
+        with open("error_log.txt", "a") as f:
+            f.write(f"{datetime.now()}: Awarded {xp_gain} XP to {skill_type}. Level: {current_level}, XP: {new_xp}/{required_skill_xp}\n")
+    except Exception as e:
+        with open("error_log.txt", "a") as f:
+            f.write(f"{datetime.now()}: Error in award_skill_xp for {skill_type}: {str(e)}\n")
 
 # === ONBOARDING ===
 if not st.session_state.get("onboarded", False):
@@ -347,7 +362,7 @@ with col2:
                 award_skill_xp(quest["type"], quest["time_min"])  # 1 XP per min
             st.session_state.progress_fitness.append(entry)
             save_user_data()
-            st.success(f"Quest '{quest['task']}' completed! +{quest['xp']} XP")
+            st.success(f"Quest '{quest['task']}' completed! +{quest['xp']} XP | +{quest.get('reps', 0) or quest.get('distance', 0) or quest.get('time_min', 0)} {quest['type'].replace('_', ' ').title()} Skill XP")
             check_level_up()
     if quest_progress == 5 and not st.session_state.get("all_quests_bonus", False):
         st.session_state.xp += 50
@@ -471,9 +486,12 @@ if workout in ["Push-ups", "Pull-ups", "Sit-ups", "Squats"]:
         entry["calories_burned"] = int(calories_burned)
         st.session_state.progress_fitness.append(entry)
         xp_gain = award_fitness_xp(type_lower, reps=reps, intensity=intensity)
-        award_skill_xp(type_lower, reps)  # 1 XP per rep
+        if reps > 0:
+            award_skill_xp(type_lower, reps)  # 1 XP per rep
+            st.success(f"Logged {reps} {variation} {workout.lower()} ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{reps} {workout} Skill XP")
+        else:
+            st.warning("Please enter at least 1 rep to earn skill XP.")
         save_user_data()
-        st.success(f"Logged {reps} {variation} {workout.lower()} ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{reps} Push Ups Skill XP")
 elif workout == "Plank":
     time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
     if st.button("Log Plank"):

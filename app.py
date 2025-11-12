@@ -2,7 +2,6 @@ import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-import plotly.express as px
 import pandas as pd
 from datetime import datetime, date
 import os
@@ -709,16 +708,6 @@ skill_df = pd.DataFrame([
     for key, value in st.session_state.skill_levels.items()
 ])
 st.table(skill_df)
-
-if st.session_state.xp_history:
-    xp_df = pd.DataFrame(st.session_state.xp_history)
-    xp_df["date"] = pd.to_datetime(xp_df["date"])
-    xp_df = xp_df[xp_df["date"] >= datetime.now() - pd.Timedelta(days=30)]
-    fig = px.bar(xp_df, x="date", y="xp", color="source", title="XP Gains Over Time")
-    fig.update_layout(font=dict(size=14))
-    st.plotly_chart(fig, use_container_width=True)
-    with st.expander("XP History"):
-        st.dataframe(xp_df[["date", "source", "xp"]], use_container_width=True)
 
 # === FORM CHECK ===
 st.subheader("Form Check")

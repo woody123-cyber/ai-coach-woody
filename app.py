@@ -157,6 +157,22 @@ if "quests_reset" not in st.session_state:
     reset_daily_quests()
     st.session_state.quests_reset = True
 
+# === CONSTANTS ===
+met_values = {
+    "push_ups": {"Low": 3.8, "Medium": 5.0, "High": 7.0},
+    "pull_ups": {"Low": 3.8, "Medium": 5.0, "High": 7.0},
+    "sit_ups": {"Low": 3.8, "Medium": 5.0, "High": 7.0},
+    "squats": {"Low": 3.8, "Medium": 5.0, "High": 7.0},
+    "plank": {"Low": 3.0, "Medium": 4.0, "High": 5.0},
+    "run": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
+    "walk_outdoor": {"Low": 3.0, "Medium": 4.0, "High": 5.0},
+    "walk_treadmill": {"Low": 3.0, "Medium": 4.0, "High": 5.0},
+    "cycle_outdoor": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
+    "cycle_static": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
+    "stretch": {"Low": 2.0, "Medium": 2.5, "High": 3.0},
+    "hiit": {"Low": 6.0, "Medium": 8.0, "High": 10.0}
+}
+
 # === XP SYSTEM ===
 def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Medium"):
     xp_gain = 10
@@ -377,20 +393,6 @@ st.title(f"{coach_name} — Fitness & Nutrition Coach")
 
 # === FITNESS SECTION ===
 st.subheader("Log Fitness")
-met_values = {
-    "push_ups": {"Low": 3.8, "Medium": 5.0, "High": 7.0},
-    "pull_ups": {"Low": 3.8, "Medium": 5.0, "High": 7.0},
-    "sit_ups": {"Low": 3.8, "Medium": 5.0, "High": 7.0},
-    "squats": {"Low": 3.8, "Medium": 5.0, "High": 7.0},
-    "plank": {"Low": 3.0, "Medium": 4.0, "High": 5.0},
-    "run": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
-    "walk_outdoor": {"Low": 3.0, "Medium": 4.0, "High": 5.0},
-    "walk_treadmill": {"Low": 3.0, "Medium": 4.0, "High": 5.0},
-    "cycle_outdoor": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
-    "cycle_static": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
-    "stretch": {"Low": 2.0, "Medium": 2.5, "High": 3.0},
-    "hiit": {"Low": 6.0, "Medium": 8.0, "High": 10.0}
-}
 workout = st.selectbox("Workout Type", [
     "Push-ups", "Pull-ups", "Sit-ups", "Squats", "Plank", "Run",
     "Walk (Outdoor)", "Walk (Treadmill)", "Cycle (Outdoor)", "Cycle (Static Bike)",

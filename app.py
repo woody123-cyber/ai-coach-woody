@@ -22,7 +22,7 @@ coach_name = "Woody" if gender == "Male (Woody)" else "Hibiki"
 
 # === LLM ===
 try:
-    llm = ChatGroq(model="llama3-70b-8192", api_key=GROQ_API_KEY, temperature=0.7)
+    llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=GROQ_API_KEY, temperature=0.7)
 except Exception as e:
     st.error(f"Failed to initialize Groq LLM: {str(e)}")
     with open("error_log.txt", "a") as f:

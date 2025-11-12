@@ -1,5 +1,4 @@
-# COACH WOODY v18 — Full AI Fitness + Nutrition Coach
-# NO OpenCV, PIL, numpy, io → 100% Working
+# COACH WOODY v19 — Protein = 1.25 × lbs (Body Weight)
 import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
@@ -42,15 +41,17 @@ if not st.session_state.name:
         st.session_state.name = name
         st.sidebar.success(f"Welcome, {name}!")
 
-# === BODY WEIGHT & MACRO CALCULATOR ===
+# ========================================
+# BODY WEIGHT & MACRO CALCULATOR (PROTEIN = 1.25 × LBS)
+# ========================================
 with st.sidebar:
     st.subheader("Body Stats")
     unit = st.radio("Weight Unit", ["kg", "st/lb"], horizontal=True)
     st.session_state.weight_unit = unit
 
     if unit == "kg":
-        weight = st.number_input("Body Weight (kg)", min_value=30.0, max_value=200.0, value=st.session_state.body_weight_kg, step=0.1)
-        st.session_state.body_weight_kg = weight
+        weight_kg = st.number_input("Body Weight (kg)", min_value=30.0, max_value=200.0, value=st.session_state.body_weight_kg, step=0.1)
+        st.session_state.body_weight_kg = weight_kg
     else:
         stones = st.number_input("Stones", min_value=4, max_value=30, value=11)
         pounds = st.number_input("Pounds", min_value=0, max_value=13, value=0)
@@ -58,11 +59,17 @@ with st.sidebar:
         st.session_state.body_weight_kg = weight_kg
         st.info(f"≈ {weight_kg:.1f} kg")
 
+    # Convert to lbs
+    weight_lbs = weight_kg * 2.20462
+
     goal = st.selectbox("Weight Goal", ["Lose Weight", "Maintain", "Gain Weight"])
     st.session_state.weight_goal = goal
 
     if st.button("Calculate Calories & Macros"):
-        maintenance = st.session_state.body_weight_kg * 2.20462 * 15
+        # Maintenance calories
+        maintenance = weight_kg * 2.20462 * 15
+
+        # Adjust for goal
         if goal == "Gain Weight":
             calories = maintenance + 200
         elif goal == "Lose Weight":
@@ -70,13 +77,20 @@ with st.sidebar:
         else:
             calories = maintenance
 
-        protein = round((calories * 0.30) / 4)
-        carbs = round((calories * 0.40) / 4)
-        fats = round((calories * 0.30) / 9)
+        # PROTEIN = 1.25 × lbs
+        protein = round(weight_lbs * 1.25)
+
+        # Remaining calories after protein
+        protein_cals = protein * 4
+        remaining_cals = calories - protein_cals
+
+        # Split remaining 50/50 between carbs and fats
+        carbs = round((remaining_cals * 0.50) / 4)
+        fats = round((remaining_cals * 0.50) / 9)
 
         st.session_state.calorie_goal = int(calories)
         st.session_state.macro_goal = {"protein": protein, "carbs": carbs, "fats": fats}
-        st.success(f"Calculated! Calories: {int(calories)}, P{protein} C{carbs} F{fats}")
+        st.success(f"Done! Protein: {protein}g (1.25×{weight_lbs:.0f} lbs)")
 
     st.divider()
     st.metric("Daily Calories", st.session_state.calorie_goal)
@@ -94,12 +108,12 @@ tab1, tab2 = st.tabs(["Fitness Coach", "Nutrition Coach"])
 with tab1:
     st.title(f"{coach_name} — Fitness Mode")
 
-    # Fitness Prompt
     fitness_prompt = f"""
     You are {coach_name}, {'motivational strength coach' if gender == 'Male (Woody)' else 'graceful, empowering trainer'}.
     Be fun, encouraging, under 120 words. Use emojis.
     User: {st.session_state.level}, Goal: {st.session_state.goal}
     Body weight: {st.session_state.body_weight_kg:.1f}kg
+    Protein goal: {st.session_state.macro_goal['protein']}g
     Track: strength (grip/type), cardio (pace/speed/incline), cycling (RPM/resistance)
     History: {{history}}
     User: {{input}}
@@ -108,7 +122,7 @@ with tab1:
     prompt = ChatPromptTemplate.from_template(fitness_prompt)
     chain = prompt | llm | StrOutputParser()
 
-    # === LOG WORKOUTS ===
+    # === LOG WORKOUTS (Same as before) ===
     workout = st.selectbox("Log Workout", [
         "Push-ups", "Pull-ups", "Sit-ups",
         "Run", "Walk (Outdoor)", "Walk (Treadmill)",
@@ -124,12 +138,7 @@ with tab1:
         variation = st.selectbox("Variation", variations[workout])
         reps = st.number_input("Reps", min_value=0, value=0)
         if st.button("Log Workout"):
-            entry = {
-                "date": datetime.now().strftime("%Y-%m-%d"),
-                "type": workout.lower().replace("-", "_"),
-                "variation": variation,
-                "reps": reps
-            }
+            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": workout.lower().replace("-", "_"), "variation": variation, "reps": reps}
             st.session_state.progress_fitness.append(entry)
             st.success(f"Logged {reps} {variation} {workout.lower()}!")
 
@@ -205,7 +214,7 @@ with tab1:
 
     # === FORM CHECK (TEXT-ONLY) ===
     st.subheader("Form Check")
-    st.info("Take a photo of your form and describe it — I’ll give feedback!")
+    st.info("Describe your form — I’ll give feedback!")
 
     # === FITNESS CHAT WITH STARTERS ===
     if "fitness_starters" not in st.session_state:
@@ -247,11 +256,10 @@ with tab1:
 with tab2:
     st.title(f"{coach_name} — Nutrition Mode")
 
-    # Nutrition Prompt
     nutrition_prompt = f"""
     You are {coach_name}, {'direct nutrition expert' if gender == 'Male (Woody)' else 'intuitive, nurturing meal guide'}.
     Be encouraging, under 120 words. Suggest meals, recipes.
-    Calorie goal: {st.session_state.calorie_goal}, Macros: P{st.session_state.macro_goal['protein']}g C{st.session_state.macro_goal['carbs']}g F{st.session_state.macro_goal['fats']}g
+    Calorie goal: {st.session_state.calorie_goal}, Protein: {st.session_state.macro_goal['protein']}g (1.25×{weight_lbs:.0f} lbs)
     History: {{history}}
     User: {{input}}
     {coach_name}:
@@ -297,6 +305,7 @@ with tab2:
 
     # === NUTRITION CHAT WITH STARTERS ===
     if "nutrition_starters" not in st.session_state:
+       skem
         st.session_state.nutrition_starters = [
             "How do I find my daily calorie intake?",
             "What are ideal macro splits?",

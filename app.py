@@ -45,7 +45,8 @@ def load_user_data():
                 "calorie_goal": int, "macro_goal": dict, "fitness_starters": list,
                 "nutrition_starters": list, "onboarded": bool, "quick_prompt": (str, type(None)),
                 "xp_history": list, "daily_quests": dict, "last_quest_date": str,
-                "user_gender": str, "user_age": int, "height_cm": float, "bmr": int
+                "user_gender": str, "user_age": int, "height_cm": float, "bmr": int,
+                "all_quests_bonus": bool
             }
             valid_data = {}
             for key, expected_type in expected_keys.items():
@@ -70,7 +71,7 @@ def save_user_data():
         "name", "body_weight_kg", "weight_unit", "weight_goal", "calorie_goal",
         "macro_goal", "fitness_starters", "nutrition_starters", "onboarded",
         "quick_prompt", "xp_history", "daily_quests", "last_quest_date",
-        "user_gender", "user_age", "height_cm", "bmr"
+        "user_gender", "user_age", "height_cm", "bmr", "all_quests_bonus"
     ]
     data = {k: st.session_state.get(k) for k in keys_to_save if k in st.session_state}
     try:
@@ -119,12 +120,7 @@ if "initialized" not in st.session_state:
         "all_quests_bonus": False
     }
     for key, value in defaults.items():
-        try:
-            st.session_state[key] = user_data.get(key, value)
-        except AttributeError as e:
-            with open("error_log.txt", "a") as f:
-                f.write(f"{datetime.now()}: AttributeError for key {key}: {str(e)}\n")
-            st.session_state[key] = value
+        st.session_state[key] = user_data.get(key, value)
     st.session_state["initialized"] = True
     save_user_data()
 
@@ -145,6 +141,7 @@ quest_pool = [
 def reset_daily_quests():
     today = date.today().strftime("%Y-%m-%d")
     if st.session_state.get("last_quest_date") != today:
+        # Reset quests without affecting XP
         selected_quests = random.sample(quest_pool, 5)
         st.session_state.daily_quests = {
             i: {"task": q["task"], "xp": q["xp"], "completed": False, "type": q["type"],
@@ -155,7 +152,10 @@ def reset_daily_quests():
         st.session_state.all_quests_bonus = False
         save_user_data()
 
-reset_daily_quests()
+# Only call reset_daily_quests once per session
+if "quests_reset" not in st.session_state:
+    reset_daily_quests()
+    st.session_state.quests_reset = True
 
 # === ONBOARDING ===
 if not st.session_state.get("onboarded", False):
@@ -176,7 +176,7 @@ if not st.session_state.get("onboarded", False):
 col1, col2 = st.columns([1, 3])
 with col1:
     st.metric("Level", st.session_state.level)
-    required_xp = 100 * st.session_state.level
+    required_xp = 100 + 50 * (st.session_state.level - 1)
     st.metric("XP", f"{st.session_state.xp}/{required_xp}")
     st.progress(min(st.session_state.xp / required_xp, 1.0))
     st.metric("Total XP", st.session_state.total_xp)
@@ -196,7 +196,12 @@ with col2:
                 "source": f"Quest: {quest['task']}",
                 "xp": quest["xp"]
             })
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": quest["type"], "intensity": "Medium"}
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "type": quest["type"],
+                "intensity": "Medium",
+                "calories_burned": 0  # Default, updated below if applicable
+            }
             if quest["reps"] > 0:
                 entry["reps"] = quest["reps"]
                 entry["variation"] = "Standard"
@@ -205,9 +210,12 @@ with col2:
                 entry["time"] = 0
             if quest["time_min"] > 0:
                 entry["time"] = quest["time_min"]
+                met = met_values.get(quest["type"], {"Medium": 4.0}).get("Medium", 4.0)
+                entry["calories_burned"] = int(met * st.session_state.body_weight_kg * (quest["time_min"] / 60))
             st.session_state.progress_fitness.append(entry)
             save_user_data()
             st.success(f"Quest '{quest['task']}' completed! +{quest['xp']} XP")
+            check_level_up()  # Check level up after quest completion
     if quest_progress == 5 and not st.session_state.get("all_quests_bonus", False):
         st.session_state.xp += 50
         st.session_state.total_xp += 50
@@ -220,6 +228,7 @@ with col2:
         save_user_data()
         st.balloons()
         st.success("All quests completed! +50 XP Bonus!")
+        check_level_up()  # Check level up after bonus
 
 # === SIDE BAR ===
 with st.sidebar:
@@ -277,7 +286,7 @@ def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Me
     intensity_multipliers = {"Low": 1.0, "Medium": 1.5, "High": 2.0}
     xp_gain *= intensity_multipliers[intensity]
     if workout_type in ["push_ups", "pull_ups", "sit_ups", "squats", "plank", "hiit", "stretch"]:
-        xp_gain += reps // 5
+        xp_gain += reps // 5 if reps > 0 else time_min // 5
     elif workout_type in ["run", "walk_outdoor", "cycle_outdoor"]:
         xp_gain += int(distance * 3)
     elif workout_type in ["walk_treadmill", "cycle_static"]:
@@ -297,6 +306,7 @@ def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Me
         "source": f"{workout_type} ({intensity})",
         "xp": xp_gain
     })
+    save_user_data()
     check_level_up()
     return xp_gain
 
@@ -327,18 +337,18 @@ def award_nutrition_xp(calories, protein, carbs, fats):
         "source": f"Meal Log (Balance Score: {balance_score:.0f}%)",
         "xp": xp_gain
     })
+    save_user_data()
     check_level_up()
     return xp_gain, balance_score
 
 def check_level_up():
-    required_xp = 100 * st.session_state.level
-    while st.session_state.xp >= required_xp:
+    required_xp = 100 + 50 * (st.session_state.level - 1)
+    if st.session_state.xp >= required_xp:
         st.session_state.xp -= required_xp
         st.session_state.level += 1
-        required_xp = 100 * st.session_state.level  # Update for new level
         st.balloons()
         st.success(f"**LEVEL UP! → Level {st.session_state.level}**")
-    save_user_data()
+        save_user_data()
 
 # === LLM INVOCATION ===
 def chain_invoke(chain, history, user_input):
@@ -399,25 +409,35 @@ if workout in ["Push-ups", "Pull-ups", "Sit-ups", "Squats"]:
     time_min = st.number_input("Time (min)", min_value=0.0, value=5.0, step=0.1)
     if st.button("Log Workout"):
         type_lower = workout.lower().replace(" ", "_")
-        entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": type_lower, "variation": variation, "reps": reps, "intensity": intensity, "time": time_min}
+        entry = {
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "type": type_lower,
+            "variation": variation,
+            "reps": reps,
+            "intensity": intensity,
+            "time": time_min
+        }
         met = met_values.get(type_lower, {"Medium": 4.0}).get(intensity, 4.0)
         calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
         entry["calories_burned"] = int(calories_burned)
         st.session_state.progress_fitness.append(entry)
         xp_gain = award_fitness_xp(type_lower, reps=reps, intensity=intensity)
-        save_user_data()
         st.success(f"Logged {reps} {variation} {workout.lower()} ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Plank":
     time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
     if st.button("Log Plank"):
         if time_min > 0:
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "plank", "time": time_min, "intensity": intensity}
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "type": "plank",
+                "time": time_min,
+                "intensity": intensity
+            }
             met = met_values.get("plank", {"Medium": 4.0}).get(intensity, 4.0)
             calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("plank", time_min=time_min, intensity=intensity)
-            save_user_data()
             st.success(f"Logged {time_min} min plank ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Run":
     distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
@@ -425,13 +445,19 @@ elif workout == "Run":
     if st.button("Log Run"):
         if distance > 0 and time_min > 0:
             pace = round(time_min / distance, 2)
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "run", "distance": distance, "time": time_min, "pace": pace, "intensity": intensity}
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "type": "run",
+                "distance": distance,
+                "time": time_min,
+                "pace": pace,
+                "intensity": intensity
+            }
             met = met_values.get("run", {"Medium": 8.0}).get(intensity, 8.0)
             calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("run", distance=distance, intensity=intensity)
-            save_user_data()
             st.success(f"Logged {distance}km run ({intensity})! Pace: {pace} min/km | Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Walk (Outdoor)":
     distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
@@ -439,13 +465,19 @@ elif workout == "Walk (Outdoor)":
     terrain = st.selectbox("Terrain", ["Flat", "Hilly", "Mixed"])
     if st.button("Log Walk"):
         if distance > 0:
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "walk_outdoor", "distance": distance, "time": time_min, "terrain": terrain, "intensity": intensity}
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "type": "walk_outdoor",
+                "distance": distance,
+                "time": time_min,
+                "terrain": terrain,
+                "intensity": intensity
+            }
             met = met_values.get("walk_outdoor", {"Medium": 4.0}).get(intensity, 4.0)
             calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("walk_outdoor", distance=distance, intensity=intensity)
-            save_user_data()
             st.success(f"Logged {distance}km walk ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Walk (Treadmill)":
     speed = st.number_input("Speed (km/h)", min_value=0.0, step=0.1)
@@ -454,13 +486,20 @@ elif workout == "Walk (Treadmill)":
     if st.button("Log Treadmill"):
         if time_min > 0:
             distance = round(speed * (time_min / 60), 2)
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "walk_treadmill", "distance": distance, "time": time_min, "speed": speed, "incline": incline, "intensity": intensity}
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "type": "walk_treadmill",
+                "distance": distance,
+                "time": time_min,
+                "speed": speed,
+                "incline": incline,
+                "intensity": intensity
+            }
             met = met_values.get("walk_treadmill", {"Medium": 4.0}).get(intensity, 4.0)
             calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("walk_treadmill", time_min=time_min, intensity=intensity)
-            save_user_data()
             st.success(f"Logged {distance}km treadmill ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Cycle (Outdoor)":
     distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
@@ -468,13 +507,19 @@ elif workout == "Cycle (Outdoor)":
     if st.button("Log Cycle"):
         if distance > 0 and time_min > 0:
             speed = round(distance / (time_min / 60), 1)
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "cycle_outdoor", "distance": distance, "time": time_min, "avg_speed": speed, "intensity": intensity}
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "type": "cycle_outdoor",
+                "distance": distance,
+                "time": time_min,
+                "avg_speed": speed,
+                "intensity": intensity
+            }
             met = met_values.get("cycle_outdoor", {"Medium": 8.0}).get(intensity, 8.0)
             calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("cycle_outdoor", distance=distance, intensity=intensity)
-            save_user_data()
             st.success(f"Logged {distance}km cycle ({intensity})! Speed: {speed} km/h | Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Cycle (Static Bike)":
     time_min = st.number_input("Time (min)", min_value=0)
@@ -482,37 +527,51 @@ elif workout == "Cycle (Static Bike)":
     rpm = st.number_input("Avg RPM", min_value=0, value=70)
     if st.button("Log Static Bike"):
         if time_min > 0:
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "cycle_static", "time": time_min, "resistance": resistance, "rpm": rpm, "intensity": intensity}
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "type": "cycle_static",
+                "time": time_min,
+                "resistance": resistance,
+                "rpm": rpm,
+                "intensity": intensity
+            }
             met = met_values.get("cycle_static", {"Medium": 8.0}).get(intensity, 8.0)
             calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("cycle_static", time_min=time_min, intensity=intensity)
-            save_user_data()
             st.success(f"Logged {time_min} min static bike ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Stretch":
     time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
     if st.button("Log Stretch"):
         if time_min > 0:
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "stretch", "time": time_min, "intensity": intensity}
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "type": "stretch",
+                "time": time_min,
+                "intensity": intensity
+            }
             met = met_values.get("stretch", {"Medium": 2.5}).get(intensity, 2.5)
             calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("stretch", time_min=time_min, intensity=intensity)
-            save_user_data()
             st.success(f"Logged {time_min} min stretch ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "HIIT":
     time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
     if st.button("Log HIIT"):
         if time_min > 0:
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "hiit", "time": time_min, "intensity": intensity}
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "type": "hiit",
+                "time": time_min,
+                "intensity": intensity
+            }
             met = met_values.get("hiit", {"Medium": 8.0}).get(intensity, 8.0)
             calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("hiit", time_min=time_min, intensity=intensity)
-            save_user_data()
             st.success(f"Logged {time_min} min HIIT ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 
 # === NUTRITION SECTION ===
@@ -523,10 +582,16 @@ protein = st.number_input("Protein (g)", min_value=0, value=0)
 carbs = st.number_input("Carbs (g)", min_value=0, value=0)
 fats = st.number_input("Fats (g)", min_value=0, value=0)
 if st.button("Log Meal"):
-    entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": meal.lower(), "calories": calories, "protein": protein, "carbs": carbs, "fats": fats}
+    entry = {
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "type": meal.lower(),
+        "calories": calories,
+        "protein": protein,
+        "carbs": carbs,
+        "fats": fats
+    }
     st.session_state.progress_nutrition.append(entry)
     xp_gain, balance_score = award_nutrition_xp(calories, protein, carbs, fats)
-    save_user_data()
     st.success(f"Logged {meal}: {calories} cal (Balance: {balance_score:.0f}%)! +{xp_gain} XP")
 
 # === CALORIE SUMMARY ===

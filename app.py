@@ -8,13 +8,10 @@ import os
 import json
 from groq import GroqError
 import random
-
 # === CONFIG ===
 st.set_page_config(page_title="Coach Woody RPG", page_icon="🏆", layout="wide")
-
 # === SECRETS ===
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-
 # === LLM ===
 try:
     llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=GROQ_API_KEY, temperature=0.7)
@@ -23,10 +20,8 @@ except Exception as e:
     with open("error_log.txt", "a") as f:
         f.write(f"{datetime.now()}: {str(e)}\n")
     llm = None
-
 # === DATA PERSISTENCE ===
 DATA_FILE = "user_data.json"
-
 def load_user_data():
     if not os.path.exists(DATA_FILE):
         return {}
@@ -60,7 +55,6 @@ def load_user_data():
         with open("error_log.txt", "a") as f:
             f.write(f"{datetime.now()}: Error loading user_data.json: {str(e)}\n")
         return {}
-
 def save_user_data():
     keys_to_save = [
         "messages", "level", "xp", "total_xp", "progress_fitness", "progress_nutrition",
@@ -77,7 +71,6 @@ def save_user_data():
     except Exception as e:
         with open("error_log.txt", "a") as f:
             f.write(f"{datetime.now()}: Error saving user_data.json: {str(e)}\n")
-
 # Initialize session state
 if "initialized" not in st.session_state:
     user_data = load_user_data()
@@ -144,7 +137,6 @@ if "initialized" not in st.session_state:
             st.session_state[key] = value
     st.session_state["initialized"] = True
     save_user_data()
-
 # === AVATAR & GEAR SYSTEM ===
 def get_avatar_title(level):
     try:
@@ -163,7 +155,6 @@ def get_avatar_title(level):
         with open("error_log.txt", "a") as f:
             f.write(f"{datetime.now()}: Error in get_avatar_title: {str(e)}\n")
         return "Novice Warrior"
-
 def get_ability(level):
     abilities = {
         5: "🔥 Advanced Form: Elbows at 45° for max push-up power!",
@@ -174,7 +165,6 @@ def get_ability(level):
         if level >= lvl:
             return ability
     return None
-
 def get_gear(level):
     gear = {
         5: "Iron Boots",
@@ -190,7 +180,6 @@ def get_gear(level):
         if level >= lvl:
             unlocked.append(item)
     return unlocked
-
 # === DAILY QUESTS ===
 quest_pool = [
     {"task": f"Defeat Sloth Beast #{random.randint(100, 999)}: 20 push-ups", "xp": 10, "type": "push_ups", "reps": 20, "desc": "Crush laziness with raw strength!"},
@@ -201,32 +190,29 @@ quest_pool = [
     {"task": f"Climb Spire #{random.randint(100, 999)}: 10 pull-ups", "xp": 15, "type": "pull_ups", "reps": 10, "desc": "Ascend to new heights!"},
     {"task": f"Ride Storm #{random.randint(100, 999)}: 10 km cycle", "xp": 15, "type": "cycle_outdoor", "distance": 10, "desc": "Speed through chaos!"},
     {"task": f"Strike Core #{random.randint(100, 999)}: 20 sit-ups", "xp": 10, "type": "sit_ups", "reps": 20, "desc": "Forge an iron midsection!"},
-    {"task": f"Mend Body #{random.randint(100, 999)}: 10 min stretch", "xp": 10, "type": "stretch", "time_one": 10, "desc": "Restore your vitality!"},
+    {"task": f"Mend Body #{random.randint(100, 999)}: 10 min stretch", "xp": 10, "type": "stretch", "time_min": 10, "desc": "Restore your vitality!"},
     {"task": f"Unleash Fury #{random.randint(100, 999)}: 20 min HIIT", "xp": 20, "type": "hiit", "time_min": 20, "desc": "Obliterate all weakness!"}
 ]
-
 def reset_daily_quests():
     today = date.today().strftime("%Y-%m-%d")
-    if st.session_state.get("last_quest_date") != today:
-        if st.session_state.get("all_quests_bonus") and st.session_state.get("last_quest_date") == (date.today() - pd.Timedelta(days=1)).strftime("%Y-%m-%d"):
-            st.session_state.quest_streak = st.session_state.get("quest_streak", 0) + 1
-        else:
-            st.session_state.quest_streak = 0
-        selected_quests = random.sample(quest_pool, 5)
-        st.session_state.daily_quests = {
-            i: {"task": q["task"], "xp": q["xp"], "completed": False, "type": q["type"],
-                "reps": q.get("reps", 0), "distance": q.get("distance", 0), "time_min": q.get("time_min", 0),
-                "desc": q["desc"]}
-            for i, q in enumerate(selected_quests)
-        }
-        st.session_state.last_quest_date = today
-        st.session_state.all_quests_bonus = False
-        save_user_data()
-
-if "quests_reset" not in st.session_state:
+    if st.session_state.get("all_quests_bonus") and st.session_state.get("last_quest_date") == (date.today() - pd.Timedelta(days=1)).strftime("%Y-%m-%d"):
+        st.session_state.quest_streak = st.session_state.get("quest_streak", 0) + 1
+    else:
+        st.session_state.quest_streak = 0
+    selected_quests = random.sample(quest_pool, 5)
+    st.session_state.daily_quests = {
+        i: {"task": q["task"], "xp": q["xp"], "completed": False, "type": q["type"],
+            "reps": q.get("reps", 0), "distance": q.get("distance", 0), "time_min": q.get("time_min", 0),
+            "desc": q["desc"]}
+        for i, q in enumerate(selected_quests)
+    }
+    st.session_state.last_quest_date = today
+    st.session_state.all_quests_bonus = False
+    save_user_data()
+# Always check and reset quests if needed
+today = date.today().strftime("%Y-%m-%d")
+if st.session_state.get("last_quest_date") != today:
     reset_daily_quests()
-    st.session_state.quests_reset = True
-
 # === CONSTANTS ===
 met_values = {
     "push_ups": {"Low": 3.8, "Medium": 5.0, "High": 7.0},
@@ -242,14 +228,12 @@ met_values = {
     "stretch": {"Low": 2.0, "Medium": 2.5, "High": 3.0},
     "hiit": {"Low": 6.0, "Medium": 8.0, "High": 10.0}
 }
-
 skill_icons = {
     "push_ups": "💪", "pull_ups": "🏋️", "sit_ups": "🧘", "squats": "🦵",
     "plank": "🛠️", "run": "🏃", "walk_outdoor": "🚶", "walk_treadmill": "🏃‍♂️",
     "cycle_outdoor": "🚴", "cycle_static": "🚲", "stretch": "🤸", "hiit": "🔥",
     "meal_log": "🍽️"
 }
-
 skill_desc = {
     "push_ups": "Master upper body strength! +10% XP at Level 10.",
     "pull_ups": "Conquer the bar with power! +10% XP at Level 10.",
@@ -265,7 +249,6 @@ skill_desc = {
     "hiit": "Unleash explosive energy! +10% XP at Level 10.",
     "meal_log": "Fuel your body wisely! +10% XP at Level 10."
 }
-
 # === ACHIEVEMENTS ===
 achievements = {
     "weekly_warrior": {"name": "Weekly Warrior", "xp": 100, "desc": "Log 3+ workouts in a week"},
@@ -274,7 +257,6 @@ achievements = {
     "skill_pioneer": {"name": "Skill Pioneer", "xp": 150, "desc": "Reach Level 10 in any skill"},
     "epic_questor": {"name": "Epic Questor", "xp": 300, "desc": "Maintain a 10-day quest streak"}
 }
-
 # === XP SYSTEM ===
 def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Medium"):
     xp_gain = 10
@@ -287,7 +269,7 @@ def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Me
     elif workout_type in ["walk_treadmill", "cycle_static"]:
         xp_gain += time_min // 5
     if st.session_state.get("guild"):
-        xp_gain = int(xp_gain * 1.05)  # +5% XP for guild members
+        xp_gain = int(xp_gain * 1.05) # +5% XP for guild members
     st.session_state.xp += xp_gain
     st.session_state.total_xp += xp_gain
     st.session_state.xp_history.append({
@@ -298,7 +280,6 @@ def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Me
     save_user_data()
     check_level_up()
     return xp_gain
-
 def award_nutrition_xp(calories, protein, carbs, fats):
     xp_gain = 10
     balance_score = 100
@@ -320,7 +301,6 @@ def award_nutrition_xp(calories, protein, carbs, fats):
     save_user_data()
     check_level_up()
     return xp_gain, balance_score
-
 def check_level_up():
     required_xp = 100 + 50 * (st.session_state.level - 1)
     if st.session_state.xp >= required_xp:
@@ -328,20 +308,22 @@ def check_level_up():
         st.session_state.level += 1
         st.balloons()
         st.success(f"**LEVEL UP! → Level {st.session_state.level}: {get_avatar_title(st.session_state.level)}**")
-        st.markdown("""
-            <audio autoplay>
-                <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
-            </audio>
-            <script>
-                if (navigator.vibrate) navigator.vibrate(200);
-            </script>
-        """, unsafe_allow_html=True)
+        try:
+            st.markdown("""
+                <audio autoplay>
+                    <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+                </audio>
+                <script>
+                    if (navigator.vibrate) navigator.vibrate(200);
+                </script>
+            """, unsafe_allow_html=True)
+        except:
+            pass  # Silent fail for audio/vibration issues
         ability = get_ability(st.session_state.level)
         if ability:
             st.info(f"New Ability Unlocked: {ability}")
         get_gear(st.session_state.level)
         save_user_data()
-
 def award_skill_xp(skill_type, amount):
     if skill_type not in st.session_state.skill_levels:
         st.session_state.skill_levels[skill_type] = {"level": 1, "xp": 0}
@@ -354,7 +336,7 @@ def award_skill_xp(skill_type, amount):
         current_xp = st.session_state.skill_levels[skill_type]["xp"]
         current_level = st.session_state.skill_levels[skill_type]["level"]
         if current_level >= 10:
-            xp_gain = int(xp_gain * 1.1)  # +10% XP for Level 10+
+            xp_gain = int(xp_gain * 1.1) # +10% XP for Level 10+
         new_xp = current_xp + xp_gain
         required_skill_xp = 100 + 50 * (current_level - 1)
         while new_xp >= required_skill_xp and current_level < 60:
@@ -367,19 +349,25 @@ def award_skill_xp(skill_type, amount):
                 st.session_state.xp += achievements["skill_pioneer"]["xp"]
                 st.session_state.total_xp += achievements["skill_pioneer"]["xp"]
                 st.success(f"Achievement Unlocked: {achievements['skill_pioneer']['name']}! +{achievements['skill_pioneer']['xp']} XP")
+                try:
+                    st.markdown("""
+                        <audio autoplay>
+                            <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+                        </audio>
+                    """, unsafe_allow_html=True)
+                except:
+                    pass
+            try:
                 st.markdown("""
                     <audio autoplay>
                         <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
                     </audio>
+                    <script>
+                        if (navigator.vibrate) navigator.vibrate(200);
+                    </script>
                 """, unsafe_allow_html=True)
-            st.markdown("""
-                <audio autoplay>
-                    <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
-                </audio>
-                <script>
-                    if (navigator.vibrate) navigator.vibrate(200);
-                </script>
-            """, unsafe_allow_html=True)
+            except:
+                pass
             required_skill_xp = 100 + 50 * (current_level - 1)
         st.session_state.skill_levels[skill_type]["xp"] = new_xp
         st.session_state.skill_levels[skill_type]["level"] = current_level
@@ -387,7 +375,6 @@ def award_skill_xp(skill_type, amount):
     except Exception as e:
         with open("error_log.txt", "a") as f:
             f.write(f"{datetime.now()}: Error in award_skill_xp for {skill_type}: {str(e)}\n")
-
 def check_achievements():
     df = pd.DataFrame(st.session_state.progress_fitness)
     if not df.empty:
@@ -399,11 +386,14 @@ def check_achievements():
             st.session_state.xp += achievements["weekly_warrior"]["xp"]
             st.session_state.total_xp += achievements["weekly_warrior"]["xp"]
             st.success(f"Achievement Unlocked: {achievements['weekly_warrior']['name']}! +{achievements['weekly_warrior']['xp']} XP")
-            st.markdown("""
-                <audio autoplay>
-                    <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
-                </audio>
-            """, unsafe_allow_html=True)
+            try:
+                st.markdown("""
+                    <audio autoplay>
+                        <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+                    </audio>
+                """, unsafe_allow_html=True)
+            except:
+                pass
             save_user_data()
             check_level_up()
     if st.session_state.get("quest_streak", 0) >= 5 and "quest_master" not in st.session_state.achievements:
@@ -411,11 +401,14 @@ def check_achievements():
         st.session_state.xp += achievements["quest_master"]["xp"]
         st.session_state.total_xp += achievements["quest_master"]["xp"]
         st.success(f"Achievement Unlocked: {achievements['quest_master']['name']}! +{achievements['quest_master']['xp']} XP")
-        st.markdown("""
-            <audio autoplay>
-                <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
-            </audio>
-        """, unsafe_allow_html=True)
+        try:
+            st.markdown("""
+                <audio autoplay>
+                    <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+                </audio>
+            """, unsafe_allow_html=True)
+        except:
+            pass
         save_user_data()
         check_level_up()
     if st.session_state.get("quest_streak", 0) >= 10 and "epic_questor" not in st.session_state.achievements:
@@ -423,29 +416,30 @@ def check_achievements():
         st.session_state.xp += achievements["epic_questor"]["xp"]
         st.session_state.total_xp += achievements["epic_questor"]["xp"]
         st.success(f"Achievement Unlocked: {achievements['epic_questor']['name']}! +{achievements['epic_questor']['xp']} XP")
-        st.markdown("""
-            <audio autoplay>
-                <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
-            </audio>
-        """, unsafe_allow_html=True)
+        try:
+            st.markdown("""
+                <audio autoplay>
+                    <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+                </audio>
+            """, unsafe_allow_html=True)
+        except:
+            pass
         save_user_data()
         check_level_up()
-
 # === ONBOARDING ===
 if not st.session_state.get("onboarded", False):
     with st.expander("🚀 Welcome to the Fitness Wasteland!", expanded=True):
         st.markdown(f"""
-        **Hero {st.session_state.name or 'Traveler'}!** 👋  
-        Welcome to Coach Woody's RPG! 🎮  
-        - 🏋️ Battle laziness with workouts to earn XP!  
-        - 🥗 Log meals to fuel your quest!  
-        - 🏆 Complete missions to become a legend!  
-        Set your stats in the sidebar to begin. Let’s conquer! 💪  
+        **Hero {st.session_state.name or 'Traveler'}!** 👋
+        Welcome to Coach Woody's RPG! 🎮
+        - 🏋️ Battle laziness with workouts to earn XP!
+        - 🥗 Log meals to fuel your quest!
+        - 🏆 Complete missions to become a legend!
+        Set your stats in the sidebar to begin. Let’s conquer! 💪
         """)
         if st.button("Embark on Quest!", key="onboard"):
             st.session_state["onboarded"] = True
             save_user_data()
-
 # === SIDE BAR ===
 with st.sidebar:
     st.subheader("⚙️ Hero Stats")
@@ -506,7 +500,6 @@ with st.sidebar:
         st.markdown(f"**{achievements[ach]['name']}**: {achievements[ach]['desc']} (+{achievements[ach]['xp']} XP)")
     if not st.session_state.achievements:
         st.info("No achievements yet. Complete quests to earn some! 🥇")
-
 # === LLM INVOCATION ===
 def chain_invoke(chain, history, user_input):
     if not llm:
@@ -528,7 +521,6 @@ def chain_invoke(chain, history, user_input):
         with open("error_log.txt", "a") as f:
             f.write(f"{datetime.now()}: {str(e)}\n")
         return "Sorry, I couldn't generate a response. Please try again."
-
 # === TOP BAR (HUD) ===
 st.markdown("<h3 style='text-align: center; color: #f0f0f0;'>🏆 Cyberpunk HUD</h3>", unsafe_allow_html=True)
 col1, col2 = st.columns([1, 3])
@@ -540,7 +532,7 @@ with col1:
         st.session_state.level = 1
         with open("error_log.txt", "a") as f:
             f.write(f"{datetime.now()}: Invalid level value: {str(e)}\n")
-    st.metric("Level", level, key="level-display")
+    st.metric("Level", level, delta=None, key="level-display")
     st.caption(f"Title: {get_avatar_title(level)}")
     required_xp = 100 + 50 * (level - 1)
     st.metric("XP", st.session_state.xp, f"{st.session_state.xp}/{required_xp}", key="xp-display")
@@ -558,14 +550,14 @@ with col1:
     total_burned = st.session_state.bmr + total_burned_workouts
     total_consumed = today_nutrition["calories"].sum() if not today_nutrition.empty else 0
     net_calories = total_consumed - total_burned
-    health = max(0, min(1, (net_calories + 1000) / 2000))  # -1000 to +1000 → 0–100%
+    health = max(0, min(1, (net_calories + 1000) / 2000)) # -1000 to +1000 → 0–100%
     health_color = "#b22222" if net_calories < 0 else "#4682b4"
     st.markdown(f"<style>.health-bar .stProgress > div > div > div > div {{ background: linear-gradient(to right, {health_color}, {health_color}80); }}</style>", unsafe_allow_html=True)
     st.markdown("**Health**")
     st.markdown('<div class="health-bar">', unsafe_allow_html=True)
     st.progress(health)
     st.markdown('</div>', unsafe_allow_html=True)
-    mana = min(1, st.session_state.bmr / 3000)  # BMR up to 3000
+    mana = min(1, st.session_state.bmr / 3000) # BMR up to 3000
     st.markdown("<style>.mana-bar .stProgress > div > div > div > div { background: linear-gradient(to right, #4682b4, #4682b480); }</style>", unsafe_allow_html=True)
     st.markdown("**Mana**")
     st.markdown('<div class="mana-bar">', unsafe_allow_html=True)
@@ -573,10 +565,8 @@ with col1:
     st.markdown('</div>', unsafe_allow_html=True)
 with col2:
     st.markdown(f"**Mission Log**: Streak: {st.session_state.get('quest_streak', 0)} Days 🔥", unsafe_allow_html=True)
-
 # === MAIN CONTENT ===
 st.markdown("<h1 style='text-align: center; color: #f0f0f0;'>Coach Woody's Fitness RPG</h1>", unsafe_allow_html=True)
-
 # Cyberpunk CSS with accessibility
 st.markdown("""
     <style>
@@ -680,7 +670,6 @@ st.markdown("""
         });
     </script>
 """, unsafe_allow_html=True)
-
 # === DAILY QUESTS EXPANDER ===
 quest_progress = sum(1 for q in st.session_state.daily_quests.values() if q["completed"])
 uncompleted_quests = 5 - quest_progress
@@ -710,20 +699,19 @@ with st.expander("Mission Briefing", expanded=uncompleted_quests > 0):
             if quest["reps"] > 0:
                 entry["reps"] = quest["reps"]
                 entry["variation"] = "Standard"
-                award_skill_xp(quest["type"], quest["reps"])
             if quest["distance"] > 0:
                 entry["distance"] = quest["distance"]
                 entry["time"] = 0
-                award_skill_xp(quest["type"], quest["distance"])
             if quest["time_min"] > 0:
                 entry["time"] = quest["time_min"]
                 met = met_values.get(quest["type"], {"Medium": 4.0}).get("Medium", 4.0)
                 entry["calories_burned"] = int(met * st.session_state.body_weight_kg * (quest["time_min"] / 60))
-                award_skill_xp(quest["type"], quest["time_min"])
             st.session_state.progress_fitness.append(entry)
+            skill_xp = quest.get("reps", 0) or quest.get("distance", 0) or quest.get("time_min", 0)
+            award_skill_xp(quest["type"], skill_xp)
             save_user_data()
             st.balloons()
-            st.success(f"Mission '{quest['task']}' cleared! +{quest['xp']} XP | +{quest.get('reps', 0) or quest.get('distance', 0) or quest.get('time_min', 0)} {quest['type'].replace('_', ' ').title()} Skill XP")
+            st.success(f"Mission '{quest['task']}' cleared! +{quest['xp']} XP | +{skill_xp} {quest['type'].replace('_', ' ').title()} Skill XP")
             check_level_up()
             check_achievements()
     if quest_progress == 5 and not st.session_state.get("all_quests_bonus", False):
@@ -740,7 +728,6 @@ with st.expander("Mission Briefing", expanded=uncompleted_quests > 0):
         st.success("All missions cleared! +50 XP Bonus! 🎉")
         check_level_up()
         check_achievements()
-
 # === TRAINING GROUNDS EXPANDER ===
 with st.expander("🏋️ Training Grounds"):
     st.subheader("Forge Your Strength")
@@ -956,7 +943,6 @@ with st.expander("🏋️ Training Grounds"):
                 save_user_data()
                 st.success(f"Trained {time_min} min HIIT ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} HIIT Skill XP")
                 check_achievements()
-
     # Log Nutrition
     st.subheader("Refuel Your Body")
     meal = st.selectbox("Meal Type", ["Breakfast", "Lunch", "Dinner", "Snack"], key="meal-select")
@@ -980,16 +966,18 @@ with st.expander("🏋️ Training Grounds"):
             st.session_state.xp += achievements["macro_master"]["xp"]
             st.session_state.total_xp += achievements["macro_master"]["xp"]
             st.success(f"Achievement Unlocked: {achievements['macro_master']['name']}! +{achievements['macro_master']['xp']} XP")
-            st.markdown("""
-                <audio autoplay>
-                    <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
-                </audio>
-            """, unsafe_allow_html=True)
+            try:
+                st.markdown("""
+                    <audio autoplay>
+                        <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+                    </audio>
+                """, unsafe_allow_html=True)
+            except:
+                pass
         award_skill_xp("meal_log", 1)
         save_user_data()
         st.success(f"Refueled with {meal}: {calories} cal (Balance: {balance_score:.0f}%)! +{xp_gain} XP | +1 Meal Log Skill XP")
         check_achievements()
-
     # Calorie Summary
     if st.session_state.progress_fitness or st.session_state.progress_nutrition:
         st.subheader("Energy Matrix")
@@ -997,7 +985,16 @@ with st.expander("🏋️ Training Grounds"):
         col1.metric("Consumed Today", int(total_consumed), key="consumed-display")
         col2.metric("Burned Today", int(total_burned), key="burned-display")
         col3.metric("Net Calories", int(net_calories), key="net-display")
-
+    # Data Export
+    st.subheader("Export Progress")
+    if st.button("Download Fitness Data (CSV)"):
+        df = pd.DataFrame(st.session_state.progress_fitness)
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("Download Fitness CSV", csv, "fitness_progress.csv", "text/csv")
+    if st.button("Download Nutrition Data (CSV)"):
+        df = pd.DataFrame(st.session_state.progress_nutrition)
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("Download Nutrition CSV", csv, "nutrition_progress.csv", "text/csv")
 # === SKILL TREE EXPANDER ===
 with st.expander("🌳 Skill Matrix"):
     st.subheader("Your Abilities")
@@ -1014,7 +1011,6 @@ with st.expander("🌳 Skill Matrix"):
             </div>
         """, unsafe_allow_html=True)
         st.progress(min(xp / required_xp, 1.0))
-
 # === COACH WOODY EXPANDER ===
 with st.expander("🤝 Command Center"):
     st.subheader("Quick Start")
@@ -1030,7 +1026,6 @@ with st.expander("🤝 Command Center"):
         for i, starter in enumerate(st.session_state.nutrition_starters):
             if st.button(starter, key=f"nut_start_{i}"):
                 st.session_state.quick_prompt = starter
-
     st.subheader("Consult Coach")
     coach_name = "Woody" if st.session_state.user_gender == "Male" else "Hibiki"
     gender = "Male (Woody)" if st.session_state.user_gender == "Male" else "Female (Hibiki)"
@@ -1067,7 +1062,6 @@ with st.expander("🤝 Command Center"):
             "🍎 Snack on apples with peanut butter for quick energy!"
         ]
         st.info(f"Coach Tip: {random.choice(tips)}")
-
     st.subheader("Form Analysis")
     st.info("Upload your form data for review! 🧠")
     form_prompt = st.text_area("Form Data", placeholder="E.g., My push-up form feels off...", key="form-input")

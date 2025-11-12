@@ -89,4 +89,35 @@ if uploaded_file:
     feedback = "Great form! Keep core tight."
     if lines is not None and len(lines) < 5:
         feedback = "Warning: Your back might be sagging. Keep a straight line!"
-    elif lines is not None and len(lines) > 15
+    elif lines is not None and len(lines) > 15:
+        feedback = "Warning: Elbows flaring. Keep them at 45°!"
+    
+    st.success(feedback)
+    st.session_state.messages.append({"role": "assistant", "content": feedback})
+
+# === CHAT ===
+st.title("Coach Woody")
+
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+if user_input := st.chat_input("Type your message..."):
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
+            kwargs = {
+                "level": st.session_state.level,
+                "goal": st.session_state.goal,
+                "history": history,
+                "input": user_input
+            }
+            if mode == "IELTS Speaking Coach":
+                kwargs["part"] = st.session_state.part
+            response = chain.invoke(kwargs)
+        st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})

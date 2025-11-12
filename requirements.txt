@@ -2,3 +2,10 @@ streamlit
 langchain
 langchain-groq
 langchain-community
+groq
+openai-whisper
+pydub
+opencv-python-headless
+pillow
+numpy
+plotly

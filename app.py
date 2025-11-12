@@ -3,48 +3,137 @@ import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+import whisper
+from pydub import AudioSegment
+import cv2
+import numpy as np
+from PIL import Image
+import plotly.express as px
+import pandas as pd
+from datetime import datetime
+import os
 
-# === YOUR SECRET KEY GOES HERE ===
-# We'll get this in Step 4
+# === CONFIG ===
+st.set_page_config(page_title="Coach Woody", page_icon="💪", layout="centered")
 
-# === The AI Brain ===
-llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=st.secrets["GROQ_API_KEY"], temperature=0.7)
+# === SECRETS ===
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
-# === What the Coach Says ===
-template = """
-You are Coach Woody, a friendly fitness coach.
-The user is a beginner learning push-ups.
-Be kind, clear, and fun. Answer in 2-3 sentences.
+# === MODE TOGGLE ===
+mode = st.sidebar.selectbox("Mode", ["Fitness Coach", "IELTS Speaking Coach"])
 
-User said: {input}
-Previous chat: {history}
+# === LLM ===
+llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=GROQ_API_KEY, temperature=0.7)
 
-Coach Alex:
-"""
-prompt = ChatPromptTemplate.from_template(template)
+# === PROMPTS ===
+if mode == "Fitness Coach":
+    system_prompt = """
+    You are Coach Woody, a world-class fitness coach.
+    Be fun, encouraging, and under 120 words.
+    User level: {level}
+    Goal: {goal}
+    History: {history}
+    User: {input}
+    Coach Woody:
+    """
+else:
+    system_prompt = """
+    You are Coach Woody, an expert IELTS Speaking coach (Band 8+).
+    Give feedback on fluency, vocab, grammar, pronunciation.
+    Suggest improvements. Under 150 words.
+    Part: {part}
+    User said: {input}
+    Coach Woody:
+    """
+
+prompt = ChatPromptTemplate.from_template(system_prompt)
 chain = prompt | llm | StrOutputParser()
 
-# === The Chat App ===
-st.title("Coach Alex – Your Push-Up Buddy")
-
+# === SESSION STATE ===
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    st.session_state.messages.append({"role": "assistant", "content": "Hi! I'm Coach Alex. How many push-ups can you do right now?"})
+    st.session_state.level = "Beginner"
+    st.session_state.goal = "Run a 5K"
+    st.session_state.part = "Part 1"
+    st.session_state.progress = []  # List of (date, value)
 
-# Show old messages
+# === SIDEBAR ===
+with st.sidebar:
+    st.header("Coach Woody")
+    if mode == "Fitness Coach":
+        st.session_state.level = st.selectbox("Level", ["Beginner", "Intermediate", "Advanced"])
+        st.session_state.goal = st.text_input("Goal", "Run a 5K")
+        reps = st.number_input("Log Push-ups", min_value=0, value=0)
+        if st.button("Log"):
+            st.session_state.progress.append({"date": datetime.now().strftime("%Y-%m-%d"), "pushups": reps})
+            st.success(f"Logged {reps} push-ups!")
+    else:
+        st.session_state.part = st.selectbox("IELTS Part", ["Part 1", "Part 2", "Part 3"])
+
+    st.divider()
+    if st.session_state.progress:
+        df = pd.DataFrame(st.session_state.progress)
+        fig = px.line(df, x="date", y="pushups", title="Push-up Progress")
+        st.plotly_chart(fig, use_container_width=True)
+
+# === VOICE INPUT ===
+st.subheader("Voice Input")
+audio = st.experimental_audio_input("Speak to Woody")
+if audio:
+    with st.spinner("Listening..."):
+        audio_segment = AudioSegment.from_file(audio)
+        audio_segment.export("temp.wav", format="wav")
+        model = whisper.load_model("base")
+        result = model.transcribe("temp.wav")
+        user_text = result["text"]
+        st.session_state.messages.append({"role": "user", "content": user_text})
+        st.chat_message("user").write(user_text)
+
+# === PHOTO FORM CHECK ===
+st.subheader("Upload Form Photo")
+uploaded_file = st.file_uploader("Snap a push-up/squat", type=["jpg", "png"])
+if uploaded_file:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Your form")
+    
+    # Simple pose detection (mock with real logic)
+    img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150)
+    lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=100, minLineLength=100, maxLineGap=10)
+    
+    feedback = "Great form! Keep core tight."
+    if lines is not None and len(lines) < 5:
+        feedback = "Warning: Your back might be sagging. Keep a straight line from head to heels!"
+    elif lines is not None and len(lines) > 15:
+        feedback = "Warning: Elbows flaring out. Keep them at 45° to your body."
+    
+    st.success(feedback)
+    st.session_state.messages.append({"role": "assistant", "content": feedback})
+
+# === CHAT ===
+st.title("Coach Woody")
+
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Get new message
-if user_input := st.chat_input("Type here..."):
+if user_input := st.chat_input("Type or speak..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-5:]])
-            response = chain.invoke({"input": user_input, "history": history})
+            history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
+            kwargs = {
+                "level": st.session_state.level,
+                "goal": st.session_state.goal,
+                "history": history,
+                "input": user_input
+            }
+            if mode == "IELTS Speaking Coach":
+                kwargs["part"] = st.session_state.part
+            response = chain.invoke(kwargs)
         st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})

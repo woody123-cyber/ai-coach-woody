@@ -1,18 +1,16 @@
-# coach_woody_app.py
+# app.py
 import streamlit as st
 import pandas as pd
 import json
 import os
 from datetime import datetime, date, timedelta
 import plotly.express as px
-import plotly.graph_objects as go
-from streamlit_confetti import confetti
 import random
 
 # === PAGE CONFIG ===
 st.set_page_config(
     page_title="Coach Woody: Level Up Your Life",
-    page_icon="🏆",
+    page_icon="Trophy",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -104,7 +102,8 @@ if user_id not in data:
 user = data[user_id]
 
 # === XP SYSTEM ===
-def xp_for_level(lvl): return 100 * lvl * (lvl + 1) // 2
+def xp_for_level(lvl): 
+    return 100 * lvl * (lvl + 1) // 2
 
 def add_xp(amount, reason=""):
     user["xp"] += amount
@@ -117,16 +116,15 @@ def check_level_up():
     if user["xp"] >= req:
         user["xp"] -= req
         user["level"] += 1
-        st.balloons()
-        confetti()
-        st.success(f"🎉 LEVEL UP! You're now **Level {user['level']}**!")
+        st.balloons()  # Built-in, no error
+        st.success(f"LEVEL UP! You're now **Level {user['level']}**!")
         unlock_gear()
 
 def unlock_gear():
     gears = ["Iron Gauntlets", "Titan Belt", "Phoenix Wraps", "Dragon Boots"]
     if user["level"] in [5, 10, 15, 20]:
         gear = gears[(user["level"]//5)-1]
-        st.toast(f"🔥 UNLOCKED: **{gear}** (+10% strength)", icon="🎒")
+        st.toast(f"UNLOCKED: **{gear}** (+10% strength)", icon="Backpack")
 
 # === STREAK & BOSS ===
 def check_streak_and_boss():
@@ -152,38 +150,37 @@ def check_streak_and_boss():
 
 # === ACHIEVEMENTS ===
 ACHIEVEMENTS = [
-    {"id": "first", "name": "First Blood", "desc": "Log your first workout", "icon": "🗡️"},
-    {"id": "streak7", "name": "Week Warrior", "desc": "7-day streak", "icon": "🔥"},
-    {"id": "boss1", "name": "Boss Slayer", "desc": "Defeat a daily boss", "icon": "👹"},
-    {"id": "volume", "name": "Volume King", "desc": "10,000 lbs in one day", "icon": "⚡"},
+    {"id": "first", "name": "First Blood", "desc": "Log your first workout", "icon": "Dagger"},
+    {"id": "streak7", "name": "Week Warrior", "desc": "7-day streak", "icon": "Fire"},
+    {"id": "boss1", "name": "Boss Slayer", "desc": "Defeat a daily boss", "icon": "Skull"},
+    {"id": "volume", "name": "Volume King", "desc": "10,000 lbs in one day", "icon": "Lightning"},
 ]
 
 def unlock_achievement(aid):
     ach = next((a for a in ACHIEVEMENTS if a["id"] == aid), None)
     if ach and aid not in user["achievements"]:
         user["achievements"].append(aid)
-        st.toast(f"🏆 {ach['icon']} **{ach['name']}** Unlocked!", icon="🎉")
+        st.toast(f"{ach['icon']} **{ach['name']}** Unlocked!", icon="Trophy")
 
 # === LOG EVENT ===
 def log_event(msg):
-    if "log" not in user: user["log"] = []
+    if "log" not in user: 
+        user["log"] = []
     user["log"].append({"time": datetime.now().strftime("%H:%M"), "msg": msg})
     user["log"] = user["log"][-30:]
 
 # === SIDEBAR ===
 with st.sidebar:
-    st.markdown("<h1 style='text-align:center; color:#fbbf24;'>🏆 Coach Woody</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align:center; color:#fbbf24;'>Trophy Coach Woody</h1>", unsafe_allow_html=True)
     
     if not user["name"]:
-        st.markdown("### ⚔️ Begin Your Legend")
+        st.markdown("### Sword Begin Your Legend")
         name = st.text_input("Hero Name", placeholder="e.g., Iron Mike", key="name_input")
         col1, col2 = st.columns([1,1])
         with col1:
             unit = st.radio("Unit", ["lbs", "kg"], horizontal=True, index=0 if user["weight_unit"]=="lbs" else 1)
             user["weight_unit"] = unit
-        with col2:
-            pass
-        if st.button("🚀 Begin Journey", use_container_width=True, type="primary"):
+        if st.button("Rocket Begin Journey", use_container_width=True, type="primary"):
             if name.strip():
                 user["name"] = name.strip().title()
                 add_xp(100, "Entered the arena!")
@@ -193,21 +190,21 @@ with st.sidebar:
             else:
                 st.error("Enter a name to begin!")
     else:
-        st.markdown(f"## 👑 **{user['name']}**")
+        st.markdown(f"## Crown **{user['name']}**")
         st.markdown(f"<div class='level-badge'>LV.{user['level']}</div>", unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
         with c1: st.metric("XP", f"{user['xp']:,}")
-        with c2: st.metric("Streak", f"{user['streak']} 🔥")
+        with c2: st.metric("Streak", f"{user['streak']} Fire")
         
         xp_needed = xp_for_level(user["level"]) - user["xp"]
         st.progress(user["xp"] / xp_for_level(user["level"]))
         st.caption(f"**{xp_needed} XP** to Level {user['level']+1}")
 
-        st.markdown("### 🎒 Power-Ups")
+        st.markdown("### Backpack Power-Ups")
         if user["powerups"]:
             for p in user["powerups"]:
-                st.markdown(f"<span class='powerup'>✨ {p}</span>", unsafe_allow_html=True)
+                st.markdown(f"<span class='powerup'>Sparkles {p}</span>", unsafe_allow_html=True)
         else:
             st.caption("_Earn from streaks!_")
 
@@ -220,10 +217,10 @@ if not user["name"]:
     - Defeat **daily bosses**
     - Get **AI coaching** & **power-ups**
     """)
-    st.info("👈 Enter your name in the sidebar to begin!")
+    st.info("Left Arrow Enter your name in the sidebar to begin!")
 else:
     check_streak_and_boss()
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["⚔️ Log", "📊 Progress", "👹 Boss", "🏆 Achievements", "🤖 Coach"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Sword Log", "Chart Increasing Progress", "Skull Boss", "Trophy Achievements", "Robot Coach"])
 
     # === LOG WORKOUT ===
     with tab1:
@@ -238,7 +235,7 @@ else:
                 reps = st.number_input("Reps", min_value=1, step=1, value=10)
                 notes = st.text_area("Notes", placeholder="PR! Felt epic!", height=80)
             
-            submitted = st.form_submit_button("💥 LOG & EARN XP", use_container_width=True)
+            submitted = st.form_submit_button("Explosion LOG & EARN XP", use_container_width=True)
             if submitted:
                 if not exercise.strip():
                     st.error("Enter an exercise!")
@@ -261,7 +258,7 @@ else:
                         user["powerups"].append("XP Boost +20%")
                     
                     st.success(f"**+{xp} XP** earned!")
-                    confetti()
+                    st.balloons()
                     st.rerun()
 
     # === PROGRESS ===
@@ -279,12 +276,12 @@ else:
 
             chart_df = df.groupby("date")["volume"].sum().reset_index()
             fig = px.area(chart_df, x="date", y="volume", title="Daily Volume")
-            fig.update_layout(template="plotly_dark")
+            fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
             st.plotly_chart(fig, use_container_width=True)
 
             top = df['exercise'].value_counts().head(6)
             fig2 = px.bar(y=top.index, x=top.values, orientation='h', title="Top Exercises")
-            fig2.update_layout(template="plotly_dark")
+            fig2.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)")
             st.plotly_chart(fig2, use_container_width=True)
         else:
             st.info("No battles fought yet. Log your first!")
@@ -294,17 +291,17 @@ else:
         st.header("Daily Boss Battle")
         boss = user["daily_boss"]
         if boss:
-            st.markdown(f"<div class='boss-card'>👹 **{boss['name']}**<br><small>{boss['task']}</small><br>Reward: **+{boss['reward']} XP**</div>", unsafe_allow_html=True)
-            if st.button("⚔️ I DEFEATED THE BOSS!", use_container_width=True):
+            st.markdown(f"<div class='boss-card'>Skull **{boss['name']}**<br><small>{boss['task']}</small><br>Reward: **+{boss['reward']} XP**</div>", unsafe_allow_html=True)
+            if st.button("Sword I DEFEATED THE BOSS!", use_container_width=True):
                 add_xp(boss["reward"], f"Defeated {boss['name']}")
                 user["boss_defeated"] += 1
                 unlock_achievement("boss1")
                 user["daily_boss"] = None
                 st.success("BOSS SLAIN! Epic loot incoming!")
-                confetti()
+                st.balloons()
                 st.rerun()
         else:
-            st.success("✅ Boss already defeated today! Rest well, warrior.")
+            st.success("Checkmark Boss already defeated today! Rest well, warrior.")
 
     # === ACHIEVEMENTS ===
     with tab4:
@@ -335,6 +332,6 @@ else:
             else:
                 st.warning("Ask me anything!")
 
-    # === SAVE ===
+    # === SAVE DATA ===
     data[user_id] = user
     save_data(data)

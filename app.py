@@ -10,7 +10,7 @@ from groq import GroqError
 import random
 
 # === CONFIG ===
-st.set_page_config(page_title="Coach Woody", page_icon="🏆", layout="wide")
+st.set_page_config(page_title="Coach Woody RPG", page_icon="🏆", layout="wide")
 
 # === SECRETS ===
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -41,7 +41,7 @@ def load_user_data():
                 "nutrition_starters": list, "onboarded": bool, "quick_prompt": (str, type(None)),
                 "xp_history": list, "daily_quests": dict, "last_quest_date": str,
                 "user_gender": str, "user_age": int, "height_cm": float, "bmr": int,
-                "all_quests_bonus": bool, "skill_levels": dict
+                "all_quests_bonus": bool, "skill_levels": dict, "achievements": list
             }
             valid_data = {}
             for key, expected_type in expected_keys.items():
@@ -67,7 +67,7 @@ def save_user_data():
         "macro_goal", "fitness_starters", "nutrition_starters", "onboarded",
         "quick_prompt", "xp_history", "daily_quests", "last_quest_date",
         "user_gender", "user_age", "height_cm", "bmr", "all_quests_bonus",
-        "skill_levels"
+        "skill_levels", "achievements"
     ]
     data = {k: st.session_state.get(k) for k in keys_to_save if k in st.session_state}
     try:
@@ -128,7 +128,8 @@ if "initialized" not in st.session_state:
             "stretch": {"level": 1, "xp": 0},
             "hiit": {"level": 1, "xp": 0},
             "meal_log": {"level": 1, "xp": 0}
-        }
+        },
+        "achievements": []  # New: List of unlocked achievements
     }
     for key, value in defaults.items():
         try:
@@ -205,8 +206,19 @@ def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Me
         week_start = datetime.now() - pd.Timedelta(days=datetime.now().weekday())
         week_logs = df[df["date"] >= week_start]
         unique_days = len(week_logs["date"].dt.date.unique())
-        if unique_days >= 3:
-            xp_gain += 50
+        if unique_days >= 3 and "weekly_warrior" not in st.session_state.achievements:
+            st.session_state.xp += 100
+            st.session_state.total_xp += 100
+            st.session_state.achievements.append("weekly_warrior")
+            st.balloons()
+            st.success("Achievement Unlocked: Weekly Warrior! +100 XP 🥇")
+            save_user_data()
+            # Play sound
+            st.markdown("""
+                <audio autoplay>
+                    <source src="https://www.orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+                </audio>
+            """, unsafe_allow_html=True)
     st.session_state.xp += xp_gain
     st.session_state.total_xp += xp_gain
     st.session_state.xp_history.append({
@@ -227,6 +239,19 @@ def award_nutrition_xp(calories, protein, carbs, fats):
         fats_diff = abs(fats - st.session_state.macro_goal["fats"]) / st.session_state.macro_goal["fats"]
         balance_score = max(0, 100 - (protein_diff + carbs_diff + fats_diff) * 100 / 3)
         xp_gain += int(balance_score * 0.15)
+        if balance_score >= 80 and "macro_master" not in st.session_state.achievements:
+            st.session_state.xp += 50
+            st.session_state.total_xp += 50
+            st.session_state.achievements.append("macro_master")
+            st.balloons()
+            st.success("Achievement Unlocked: Macro Master! +50 XP 🥦")
+            save_user_data()
+            # Play sound
+            st.markdown("""
+                <audio autoplay>
+                    <source src="https://www.orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+                </audio>
+            """, unsafe_allow_html=True)
     df = pd.DataFrame(st.session_state.progress_nutrition)
     if not df.empty:
         df["date"] = pd.to_datetime(df["date"])
@@ -242,7 +267,7 @@ def award_nutrition_xp(calories, protein, carbs, fats):
     st.session_state.total_xp += xp_gain
     st.session_state.xp_history.append({
         "date": datetime.now().strftime("%Y-%m-%d"),
-        "source": f"Meal Log (Balance: {balance_score:.0f}%)",
+        "source": f"Meal Log (Balance Score: {balance_score:.0f}%)",
         "xp": xp_gain
     })
     save_user_data()
@@ -256,6 +281,12 @@ def check_level_up():
         st.session_state.level += 1
         st.balloons()
         st.success(f"**LEVEL UP! → Level {st.session_state.level}**")
+        # Play sound
+        st.markdown("""
+            <audio autoplay>
+                <source src="https://www.orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+            </audio>
+        """, unsafe_allow_html=True)
         save_user_data()
 
 def award_skill_xp(skill_type, amount):
@@ -277,6 +308,12 @@ def award_skill_xp(skill_type, amount):
             st.balloons()
             st.success(f"**{skill_type.replace('_', ' ').title()} SKILL LEVEL UP! → Level {current_level}**")
             required_skill_xp = 100 + 50 * (current_level - 1)
+            # Play sound
+            st.markdown("""
+                <audio autoplay>
+                    <source src="https://www.orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+                </audio>
+            """, unsafe_allow_html=True)
         st.session_state.skill_levels[skill_type]["xp"] = new_xp
         st.session_state.skill_levels[skill_type]["level"] = current_level
         save_user_data()
@@ -286,70 +323,35 @@ def award_skill_xp(skill_type, amount):
         with open("error_log.txt", "a") as f:
             f.write(f"{datetime.now()}: Error in award_skill_xp for {skill_type}: {str(e)}\n")
 
-# === ONBOARDING ===
-if not st.session_state.get("onboarded", False):
-    with st.expander("🚀 Welcome to Coach Woody!", expanded=True):
-        st.markdown(f"""
-        **Hi, {st.session_state.name or 'Athlete'}!** 👋  
-        Welcome to your fitness RPG! 🎮  
-        - 🏋️ Log workouts to earn XP and level up skills!  
-        - 🥗 Track meals to hit macro goals!  
-        - 🏆 Complete daily quests for bonus XP!  
-        Set your stats in the sidebar to begin your adventure. Let’s grind! 💪  
-        """)
-        if st.button("Start Quest!"):
-            st.session_state["onboarded"] = True
-            save_user_data()
+# === ACHIEVEMENTS SYSTEM ===
+achievements = {
+    "weekly_warrior": {"name": "Weekly Warrior", "xp": 100, "desc": "3+ workouts in a week"},
+    "macro_master": {"name": "Macro Master", "xp": 50, "desc": "80%+ balance score"},
+    "quest_master": {"name": "Quest Master", "xp": 200, "desc": "Complete all quests 5 days in a row"},
+    "skill_pioneer": {"name": "Skill Pioneer", "xp": 150, "desc": "Reach Level 10 in any skill"}
+}
 
-# === SIDE BAR ===
-with st.sidebar:
-    st.subheader("⚙️ Player Stats")
-    if not st.session_state.name:
-        name = st.text_input("Your Name", placeholder="Jake")
-        if name:
-            st.session_state.name = name
-            st.success(f"Welcome, {name}!")
-            save_user_data()
-    st.session_state.user_gender = st.radio("Gender", ["Male", "Female"], horizontal=True)
-    st.session_state.user_age = st.number_input("Age", min_value=18, max_value=100, value=st.session_state.user_age)
-    st.session_state.height_cm = st.number_input("Height (cm)", min_value=100.0, max_value=250.0, value=st.session_state.height_cm, step=0.1)
-    unit = st.radio("Weight Unit", ["kg", "st/lb"], horizontal=True)
-    st.session_state.weight_unit = unit
-    if unit == "kg":
-        weight = st.number_input("Body Weight (kg)", min_value=30.0, max_value=200.0, value=st.session_state.body_weight_kg, step=0.1)
-        st.session_state.body_weight_kg = weight
-    else:
-        stones = st.number_input("Stones", min_value=4, max_value=30, value=11)
-        pounds = st.number_input("Pounds", min_value=0, max_value=13, value=0)
-        weight_kg = (stones * 6.35029) + (pounds * 0.453592)
-        st.session_state.body_weight_kg = weight_kg
-        st.info(f"≈ {weight_kg:.1f} kg")
-    goal = st.selectbox("Weight Goal", ["Lose Weight", "Maintain", "Gain Weight"])
-    st.session_state.weight_goal = goal
-    if st.button("Calculate Calories & Macros"):
-        if st.session_state.user_gender == "Male":
-            bmr = 88.362 + (13.397 * st.session_state.body_weight_kg) + (4.799 * st.session_state.height_cm) - (5.677 * st.session_state.user_age)
-        else:
-            bmr = 447.593 + (9.247 * st.session_state.body_weight_kg) + (3.098 * st.session_state.height_cm) - (4.330 * st.session_state.user_age)
-        st.session_state.bmr = int(bmr)
-        maintenance = bmr * 1.55  # Moderate activity
-        calories = maintenance + (200 if goal == "Gain Weight" else -200 if goal == "Lose Weight" else 0)
-        protein = round(st.session_state.body_weight_kg * 2.20462 * 1.25)
-        protein_cals = protein * 4
-        remaining = max(0, calories - protein_cals)
-        carbs = round(remaining * 0.5 / 4)
-        fats = round(remaining * 0.5 / 9)
-        st.session_state.calorie_goal = int(calories)
-        st.session_state.macro_goal = {"protein": protein, "carbs": carbs, "fats": fats}
-        st.success(f"Done! BMR: {st.session_state.bmr} cal | Daily Calories: {int(calories)} cal | P{protein}g")
-        save_user_data()
-    st.divider()
-    st.metric("BMR", st.session_state.bmr)
-    st.metric("Daily Calories", st.session_state.calorie_goal)
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Protein", f"{st.session_state.macro_goal['protein']}g")
-    col2.metric("Carbs", f"{st.session_state.macro_goal['carbs']}g")
-    col3.metric("Fats", f"{st.session_state.macro_goal['fats']}g")
+def check_achievements():
+    if "weekly_warrior" not in st.session_state.achievements:
+        df = pd.DataFrame(st.session_state.progress_fitness)
+        if not df.empty:
+            df["date"] = pd.to_datetime(df["date"])
+            week_start = datetime.now() - pd.Timedelta(days=7)
+            week_logs = df[df["date"] >= week_start]
+            if len(week_logs["date"].dt.date.unique()) >= 3:
+                st.session_state.achievements.append("weekly_warrior")
+                st.session_state.xp += achievements["weekly_warrior"]["xp"]
+                st.session_state.total_xp += achievements["weekly_warrior"]["xp"]
+                st.success(f"Achievement Unlocked: {achievements['weekly_warrior']['name']}! +{achievements['weekly_warrior']['xp']} XP - {achievements['weekly_warrior']['desc']}")
+                # Play sound
+                st.markdown("""
+                    <audio autoplay>
+                        <source src="https://www.orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+                    </audio>
+                """, unsafe_allow_html=True)
+                save_user_data()
+                check_level_up()
+    # Add more checks for other achievements (e.g., macro_master in award_nutrition_xp, skill_pioneer in award_skill_xp, etc.)
 
 # === LLM INVOCATION ===
 def chain_invoke(chain, history, user_input):
@@ -388,7 +390,7 @@ with col2:
 # === MAIN CONTENT ===
 st.markdown("<h1 style='text-align: center; color: #f0f0f0;'>Coach Woody's Fitness RPG</h1>", unsafe_allow_html=True)
 
-# Gaming CSS with toned-down, readable colors
+# Gaming CSS with grey-based, readable colors
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
@@ -542,6 +544,7 @@ with st.expander("🏋️ Track Fitness & Nutrition"):
             else:
                 st.warning("Please enter at least 1 rep to earn skill XP.")
             save_user_data()
+            check_achievements()
     elif workout == "Plank":
         time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
         if st.button("Log Plank"):
@@ -560,6 +563,7 @@ with st.expander("🏋️ Track Fitness & Nutrition"):
                 award_skill_xp("plank", int(time_min))
                 save_user_data()
                 st.success(f"Logged {time_min} min plank ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Plank Skill XP")
+                check_achievements()
     elif workout == "Run":
         distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
         time_min = st.number_input("Time (min)", min_value=0)
@@ -582,6 +586,7 @@ with st.expander("🏋️ Track Fitness & Nutrition"):
                 award_skill_xp("run", int(distance))
                 save_user_data()
                 st.success(f"Logged {distance}km run ({intensity})! Pace: {pace} min/km | Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Run Skill XP")
+                check_achievements()
     elif workout == "Walk (Outdoor)":
         distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
         time_min = st.number_input("Time (min)", min_value=0)
@@ -604,6 +609,7 @@ with st.expander("🏋️ Track Fitness & Nutrition"):
                 award_skill_xp("walk_outdoor", int(distance))
                 save_user_data()
                 st.success(f"Logged {distance}km walk ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Walk Outdoor Skill XP")
+                check_achievements()
     elif workout == "Walk (Treadmill)":
         speed = st.number_input("Speed (km/h)", min_value=0.0, step=0.1)
         incline = st.number_input("Incline (%)", min_value=0.0, step=0.5)
@@ -628,6 +634,7 @@ with st.expander("🏋️ Track Fitness & Nutrition"):
                 award_skill_xp("walk_treadmill", int(time_min))
                 save_user_data()
                 st.success(f"Logged {distance}km treadmill ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Walk Treadmill Skill XP")
+                check_achievements()
     elif workout == "Cycle (Outdoor)":
         distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
         time_min = st.number_input("Time (min)", min_value=0)
@@ -650,6 +657,7 @@ with st.expander("🏋️ Track Fitness & Nutrition"):
                 award_skill_xp("cycle_outdoor", int(distance))
                 save_user_data()
                 st.success(f"Logged {distance}km cycle ({intensity})! Speed: {speed} km/h | Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Cycle Outdoor Skill XP")
+                check_achievements()
     elif workout == "Cycle (Static Bike)":
         time_min = st.number_input("Time (min)", min_value=0)
         resistance = st.slider("Resistance", 1, 20, 10)
@@ -672,6 +680,7 @@ with st.expander("🏋️ Track Fitness & Nutrition"):
                 award_skill_xp("cycle_static", int(time_min))
                 save_user_data()
                 st.success(f"Logged {time_min} min static bike ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Cycle Static Skill XP")
+                check_achievements()
     elif workout == "Stretch":
         time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
         if st.button("Log Stretch"):
@@ -690,6 +699,7 @@ with st.expander("🏋️ Track Fitness & Nutrition"):
                 award_skill_xp("stretch", int(time_min))
                 save_user_data()
                 st.success(f"Logged {time_min} min stretch ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Stretch Skill XP")
+                check_achievements()
     elif workout == "HIIT":
         time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
         if st.button("Log HIIT"):
@@ -708,66 +718,11 @@ with st.expander("🏋️ Track Fitness & Nutrition"):
                 award_skill_xp("hiit", int(time_min))
                 save_user_data()
                 st.success(f"Logged {time_min} min HIIT ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} HIIT Skill XP")
+                check_achievements()
 
     # Log Nutrition
     st.subheader("Log Nutrition")
     meal = st.selectbox("Meal Type", ["Breakfast", "Lunch", "Dinner", "Snack"])
-    calories = st.number_input("Calories", min_value=0, value=0)
-    protein = st.number_input("Protein (g)", min_value=0, value=0)
-    carbs = st.number_input("Carbs (g)", min_value=0, value=0)
-    fats = st.number_input("Fats (g)", min_value=0, value=0)
-    if st.button("Log Meal"):
-        entry = {
-            "date": datetime.now().strftime("%Y-%m-%d"),
-            "type": meal.lower(),
-            "calories": calories,
-            "protein": protein,
-            "carbs": carbs,
-            "fats": fats
-        }
-        st.session_state.progress_nutrition.append(entry)
-        xp_gain, balance_score = award_nutrition_xp(calories, protein, carbs, fats)
-        award_skill_xp("meal_log", 1)
-        save_user_data()
-        st.success(f"Logged {meal}: {calories} cal (Balance: {balance_score:.0f}%)! +{xp_gain} XP | +1 Meal Log Skill XP")
-
-    # Calorie Summary
-    if st.session_state.progress_fitness or st.session_state.progress_nutrition:
-        fitness_df = pd.DataFrame(st.session_state.progress_fitness)
-        nutrition_df = pd.DataFrame(st.session_state.progress_nutrition)
-        if not fitness_df.empty:
-            fitness_df["date"] = pd.to_datetime(fitness_df["date"])
-        if not nutrition_df.empty:
-            nutrition_df["date"] = pd.to_datetime(nutrition_df["date"])
-        today_fitness = fitness_df[fitness_df["date"].dt.date == datetime.now().date()] if not fitness_df.empty else pd.DataFrame()
-        today_nutrition = nutrition_df[nutrition_df["date"].dt.date == datetime.now().date()] if not nutrition_df.empty else pd.DataFrame()
-        total_burned_workouts = today_fitness["calories_burned"].sum() if "calories_burned" in today_fitness.columns else 0
-        total_burned = st.session_state.bmr + total_burned_workouts
-        total_consumed = today_nutrition["calories"].sum() if not today_nutrition.empty else 0
-        net_calories = total_consumed - total_burned
-        st.subheader("Calorie Summary")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Consumed Today", int(total_consumed))
-        col2.metric("Burned Today", int(total_burned))
-        col3.metric("Net Calories", int(net_calories))
-
-# === PROGRESS EXPANDER ===
-with st.expander("📊 Skill Tree"):
-    st.subheader("Skills")
-    for key, value in st.session_state.skill_levels.items():
-        skill_name = key.replace("_", " ").title()
-        level = value["level"]
-        xp = value["xp"]
-        required_xp = 100 + 50 * (level - 1)
-        st.markdown(f"**{skill_name}: Level {level}** ({xp}/{required_xp} XP)")
-        st.progress(min(xp / required_xp, 1.0))
-
-# === COACH WOODY EXPANDER ===
-with st.expander("🤝 Coach Woody"):
-    # Quick Start
-    st.subheader("Quick Start")
-    st.write("Ask about fitness or nutrition! 🌟")
-    col’clock": ["Breakfast", "Lunch", "Dinner", "Snack"])
     calories = st.number_input("Calories", min_value=0, value=0)
     protein = st.number_input("Protein (g)", min_value=0, value=0)
     carbs = st.number_input("Carbs (g)", min_value=0, value=0)
@@ -837,8 +792,6 @@ with st.expander("🤝 Coach Woody"):
 
     # Ask Coach Woody
     st.subheader("Ask Coach Woody")
-    coach_name = "Woody" if st.session_state.user_gender == "Male" else "Hibiki"
-    gender = "Male (Woody)" if st.session_state.user_gender == "Male" else "Female (Hibiki)"
     prompt = ChatPromptTemplate.from_template(f"""
     You are {coach_name}, {'motivational strength coach' if gender == 'Male (Woody)' else 'graceful, empowering trainer'}.
     Be fun, encouraging, under 120 words. Use emojis. Answer fitness or nutrition questions. Suggest meals/recipes for nutrition queries.

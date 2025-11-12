@@ -21,7 +21,13 @@ gender = st.sidebar.radio("Coach Gender", ["Male (Woody)", "Female (Hibiki)"], h
 coach_name = "Woody" if gender == "Male (Woody)" else "Hibiki"
 
 # === LLM ===
-llm = ChatGroq(model="llama3-70b-8192", api_key=GROQ_API_KEY, temperature=0.7, max_tokens=1024)
+try:
+    llm = ChatGroq(model="llama3-8b-8192", api_key=GROQ_API_KEY, temperature=0.7)
+except Exception as e:
+    st.error(f"Failed to initialize Groq LLM: {str(e)}")
+    with open("error_log.txt", "a") as f:
+        f.write(f"{datetime.now()}: {str(e)}\n")
+    st.stop()
 
 # === DATA PERSISTENCE ===
 DATA_FILE = "user_data.json"
@@ -84,7 +90,7 @@ if not st.session_state.get("onboarded", False):
         - 🏋️ Log workouts and get fitness tips  
         - 🥗 Track meals and macros  
         - 🗣️ Practice IELTS Speaking with a 60-level quest  
-        Start by setting your **name** and **body stats** in the sidebar. Choose a tab to begin!  
+        Start by setting your name and body stats in the sidebar. Choose a tab to begin!  
         """)
         if st.button("Got it!"):
             st.session_state["onboarded"] = True
@@ -235,9 +241,9 @@ with tab1:
                 pace = round(time_min / distance, 2)
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "run", "distance": distance, "time": time_min, "pace": pace}
                 st.session_state.progress_fitness.append(entry)
-                xp_gain = award_fitness_xp("run", distance=distance)
-                save_user_data()
-                st.success(f"Logged {distance}km! Pace: {pace} min/km! +{xp_gain} XP")
+            xp_gain = award_fitness_xp("run", distance=distance)
+            save_user_data()
+            st.success(f"Logged {distance}km! Pace: {pace} min/km! +{xp_gain} XP")
     elif workout == "Walk (Outdoor)":
         distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
         time_min = st.number_input("Time (min)", min_value=0)

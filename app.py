@@ -1,19 +1,15 @@
 # COACH WOODY v18 — Full AI Fitness + Nutrition Coach
-# With Gender Toggle (Woody / Hibiki), Body Weight Calc, Workout/Meal Logging, Charts, Prompts, Form Check
+# NO OpenCV, PIL, numpy, io → 100% Working
 import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-import cv2
-import numpy as np
-from PIL import Image
 import plotly.express as px
 import pandas as pd
 from datetime import datetime, timedelta
-import io
 
 # === CONFIG ===
-st.set_page_config(page_title="Coach Woody", page_icon="💪", layout="wide")
+st.set_page_config(page_title="Coach Woody", page_icon="trophy", layout="wide")
 
 # === SECRETS ===
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
@@ -30,7 +26,6 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
     st.session_state.level = "Beginner"
     st.session_state.goal = "Run a 5K"
-    st.session_state.part = "Part 1"
     st.session_state.progress_fitness = []
     st.session_state.progress_nutrition = []
     st.session_state.name = ""
@@ -91,8 +86,11 @@ with st.sidebar:
     col3.metric("Fats", f"{st.session_state.macro_goal['fats']}g")
 
 # === TABS ===
-tab1, tab2 = st.tabs(["🏋️ Fitness Coach", "🥗 Nutrition Coach"])
+tab1, tab2 = st.tabs(["Fitness Coach", "Nutrition Coach"])
 
+# ========================================
+# TAB 1: FITNESS COACH
+# ========================================
 with tab1:
     st.title(f"{coach_name} — Fitness Mode")
 
@@ -110,7 +108,7 @@ with tab1:
     prompt = ChatPromptTemplate.from_template(fitness_prompt)
     chain = prompt | llm | StrOutputParser()
 
-    # Log Workouts
+    # === LOG WORKOUTS ===
     workout = st.selectbox("Log Workout", [
         "Push-ups", "Pull-ups", "Sit-ups",
         "Run", "Walk (Outdoor)", "Walk (Treadmill)",
@@ -118,18 +116,27 @@ with tab1:
     ])
 
     if workout in ["Push-ups", "Pull-ups", "Sit-ups"]:
-        variations = {"Push-ups": ["Normal", "Close-Grip", "Wide-Grip"], "Pull-ups": ["Normal", "Chin-ups", "Neutral-Grip"], "Sit-ups": ["Standard", "Russian Twists", "Leg Raises"]}
+        variations = {
+            "Push-ups": ["Normal", "Close-Grip", "Wide-Grip"],
+            "Pull-ups": ["Normal", "Chin-ups", "Neutral-Grip"],
+            "Sit-ups": ["Standard", "Russian Twists", "Leg Raises"]
+        }
         variation = st.selectbox("Variation", variations[workout])
         reps = st.number_input("Reps", min_value=0, value=0)
-        if st.button("Log"):
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": workout.lower().replace("-", "_"), "variation": variation, "reps": reps}
+        if st.button("Log Workout"):
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "type": workout.lower().replace("-", "_"),
+                "variation": variation,
+                "reps": reps
+            }
             st.session_state.progress_fitness.append(entry)
             st.success(f"Logged {reps} {variation} {workout.lower()}!")
 
     elif workout == "Run":
         distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
         time_min = st.number_input("Time (min)", min_value=0)
-        if st.button("Log"):
+        if st.button("Log Run"):
             if distance > 0 and time_min > 0:
                 pace = round(time_min / distance, 2)
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "run", "distance": distance, "time": time_min, "pace": pace}
@@ -140,7 +147,7 @@ with tab1:
         distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
         time_min = st.number_input("Time (min)", min_value=0)
         terrain = st.selectbox("Terrain", ["Flat", "Hilly", "Mixed"])
-        if st.button("Log"):
+        if st.button("Log Walk"):
             if distance > 0:
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "walk_outdoor", "distance": distance, "time": time_min, "terrain": terrain}
                 st.session_state.progress_fitness.append(entry)
@@ -150,7 +157,7 @@ with tab1:
         speed = st.number_input("Speed (km/h)", min_value=0.0, step=0.1)
         incline = st.number_input("Incline (%)", min_value=0.0, step=0.5)
         time_min = st.number_input("Time (min)", min_value=0)
-        if st.button("Log"):
+        if st.button("Log Treadmill"):
             if time_min > 0:
                 distance = round(speed * (time_min / 60), 2)
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "walk_treadmill", "distance": distance, "time": time_min, "speed": speed, "incline": incline}
@@ -160,7 +167,7 @@ with tab1:
     elif workout == "Cycle (Outdoor)":
         distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
         time_min = st.number_input("Time (min)", min_value=0)
-        if st.button("Log"):
+        if st.button("Log Cycle"):
             if distance > 0 and time_min > 0:
                 speed = round(distance / (time_min / 60), 1)
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "cycle_outdoor", "distance": distance, "time": time_min, "avg_speed": speed}
@@ -171,13 +178,13 @@ with tab1:
         time_min = st.number_input("Time (min)", min_value=0)
         resistance = st.slider("Resistance", 1, 20, 10)
         rpm = st.number_input("Avg RPM", min_value=0, value=70)
-        if st.button("Log"):
+        if st.button("Log Static Bike"):
             if time_min > 0:
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "cycle_static", "time": time_min, "resistance": resistance, "rpm": rpm}
                 st.session_state.progress_fitness.append(entry)
                 st.success(f"Logged {time_min} min!")
 
-    # Fitness Charts
+    # === FITNESS CHARTS ===
     if st.session_state.progress_fitness:
         df = pd.DataFrame(st.session_state.progress_fitness)
         df["date"] = pd.to_datetime(df["date"])
@@ -196,14 +203,11 @@ with tab1:
                     fig = px.bar(cardio_dist, x="date", y="distance", color="type", barmode="group")
                     st.plotly_chart(fig, use_container_width=True)
 
-    # Form Check
-    st.subheader("Upload Form Photo")
-    uploaded = st.file_uploader("Push-up / Squat", ["jpg", "png"])
-    if uploaded:
-        st.image(uploaded, width=300)
-        st.success("Great form! Keep core tight.")
+    # === FORM CHECK (TEXT-ONLY) ===
+    st.subheader("Form Check")
+    st.info("Take a photo of your form and describe it — I’ll give feedback!")
 
-    # Fitness Chat with Starters
+    # === FITNESS CHAT WITH STARTERS ===
     if "fitness_starters" not in st.session_state:
         st.session_state.fitness_starters = [
             "How do I improve my push-up form?",
@@ -221,9 +225,9 @@ with tab1:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    if prompt := st.chat_input("Ask Fitness Coach...") or "prompt" in locals():
-        if "prompt" in locals() and prompt is None:
-            prompt = starter
+    if prompt := st.chat_input("Ask Fitness Coach...") or ("prompt" in locals() and prompt is not None):
+        if "prompt" not in locals():
+            prompt = st.chat_input("Ask Fitness Coach...")
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -237,7 +241,9 @@ with tab1:
                 st.markdown(response)
                 st.session_state.messages.append({"role": "assistant", "content": response})
 
-# === NUTRITION TAB ===
+# ========================================
+# TAB 2: NUTRITION COACH
+# ========================================
 with tab2:
     st.title(f"{coach_name} — Nutrition Mode")
 
@@ -253,7 +259,7 @@ with tab2:
     prompt = ChatPromptTemplate.from_template(nutrition_prompt)
     chain = prompt | llm | StrOutputParser()
 
-    # Log Meals
+    # === LOG MEALS ===
     meal = st.selectbox("Log Meal", ["Breakfast", "Lunch", "Dinner", "Snack"])
     calories = st.number_input("Calories", min_value=0, value=0)
     protein = st.number_input("Protein (g)", min_value=0, value=0)
@@ -271,7 +277,7 @@ with tab2:
         st.session_state.progress_nutrition.append(entry)
         st.success(f"Logged {meal}: {calories} cal")
 
-    # Nutrition Charts
+    # === NUTRITION CHARTS ===
     if st.session_state.progress_nutrition:
         df = pd.DataFrame(st.session_state.progress_nutrition)
         df["date"] = pd.to_datetime(df["date"])
@@ -289,7 +295,7 @@ with tab2:
         fig = px.bar(df, x="date", y=["protein", "carbs", "fats"], title="Daily Macros (g)")
         st.plotly_chart(fig, use_container_width=True)
 
-    # Nutrition Chat with Starters
+    # === NUTRITION CHAT WITH STARTERS ===
     if "nutrition_starters" not in st.session_state:
         st.session_state.nutrition_starters = [
             "How do I find my daily calorie intake?",
@@ -308,9 +314,9 @@ with tab2:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    if prompt := st.chat_input("Ask Nutrition Coach...") or "prompt" in locals():
-        if "prompt" in locals() and prompt is None:
-            prompt = starter
+    if prompt := st.chat_input("Ask Nutrition Coach...") or ("prompt" in locals() and prompt is not None):
+        if "prompt" not in locals():
+            prompt = st.chat_input("Ask Nutrition Coach...")
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)

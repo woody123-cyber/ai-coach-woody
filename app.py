@@ -21,7 +21,7 @@ gender = st.sidebar.radio("Coach Gender", ["Male (Woody)", "Female (Hibiki)"], h
 coach_name = "Woody" if gender == "Male (Woody)" else "Hibiki"
 
 # === LLM ===
-llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=GROQ_API_KEY, temperature=0.7)
+llm = ChatGroq(model="llama3-70b-8192", api_key=GROQ_API_KEY, temperature=0.7, max_tokens=1024)
 
 # === DATA PERSISTENCE ===
 DATA_FILE = "user_data.json"
@@ -197,7 +197,7 @@ tab1, tab2, tab3 = st.tabs(["Fitness Coach", "Nutrition Coach", "Speaking Quest"
 # TAB 1: FITNESS COACH
 # ========================================
 with tab1:
-    st.title(f"{coach_name} — Fitness Mode")
+    st.title(f"{coach_name} — Fitness Mode# Fitness Coach")
     fitness_prompt = f"""
     You are {coach_name}, {'motivational strength coach' if gender == 'Male (Woody)' else 'graceful, empowering trainer'}.
     Be fun, encouraging, under 120 words. Use emojis.
@@ -208,7 +208,6 @@ with tab1:
     """
     prompt = ChatPromptTemplate.from_template(fitness_prompt)
     chain = prompt | llm | StrOutputParser()
-    # Log Workouts
     workout = st.selectbox("Log Workout", [
         "Push-ups", "Pull-ups", "Sit-ups",
         "Run", "Walk (Outdoor)", "Walk (Treadmill)",
@@ -284,7 +283,6 @@ with tab1:
                 xp_gain = award_fitness_xp("cycle_static", time_min=time_min)
                 save_user_data()
                 st.success(f"Logged {time_min} min! +{xp_gain} XP")
-    # Fitness Charts
     if st.session_state.progress_fitness:
         df = pd.DataFrame(st.session_state.progress_fitness)
         df["date"] = pd.to_datetime(df["date"])
@@ -307,7 +305,6 @@ with tab1:
                     st.plotly_chart(fig, use_container_width=True)
     st.subheader("Form Check")
     st.info("Describe your form — I’ll give feedback!")
-    # Quick Start Buttons
     st.subheader("Quick Start")
     cols = st.columns(3)
     for i, starter in enumerate(st.session_state.fitness_starters):
@@ -423,7 +420,7 @@ with tab3:
     col3.metric("Streak", f"{st.session_state.streak} days")
     progress = min(st.session_state.xp / 100, 1.0)
     st.progress(progress)
-    st.caption(f"**Band {st.session_state.last_band:.1f}** → Next Level: {st.session_state.level + 1}")
+    st.caption Says: st.caption(f"**Band {st.session_state.last_band:.1f}** → Next Level: {st.session_state.level + 1}")
     languages = {
         "English": "English", "中文": "Chinese", "Español": "Spanish", "हिन्दी": "Hindi",
         "العربية": "Arabic", "Português": "Portuguese", "বাংলা": "Bengali", "Русский": "Russian",
@@ -462,7 +459,7 @@ with tab3:
             return bank[1][0] if part == "Part 1" else bank[1]
         elif level <= 30:
             return bank[10][0] if part == "Part 1" else bank[10]
-        elif level <= 30:
+        elif level <= 50:
             return bank[30][0] if part == "Part 1" else bank[30]
         else:
             return bank[50][0] if part == "Part 1" else bank[50]

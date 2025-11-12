@@ -443,7 +443,7 @@ if not st.session_state.get("onboarded", False):
 
 # === SIDE BAR ===
 with st.sidebar:
-    st.subheader("⚙️ Hero Stats", key="hero-stats")
+    st.subheader("⚙️ Hero Stats")  # Removed key="hero-stats"
     if not st.session_state.name:
         name = st.text_input("Your Name", placeholder="Jake", key="name-input")
         if name:
@@ -489,14 +489,14 @@ with st.sidebar:
         st.success(f"Done! BMR: {st.session_state.bmr} cal | Daily Calories: {int(calories)} cal")
         save_user_data()
     st.divider()
-    st.subheader("🛡️ Guild", key="guild-header")
+    st.subheader("🛡️ Guild")  # Removed key="guild-header"
     guilds = ["", "Strength Warriors", "Endurance Runners", "Flexibility Mages"]
     st.session_state.guild = st.selectbox("Join a Guild (+5% XP)", guilds, key="guild-select")
     if st.session_state.guild:
         st.info(f"Guild: {st.session_state.guild}")
     save_user_data()
     st.divider()
-    st.subheader("🏅 Achievements", key="achievements-header")
+    st.subheader("🏅 Achievements")  # Removed key="achievements-header"
     for ach in st.session_state.achievements:
         st.markdown(f"**{achievements[ach]['name']}**: {achievements[ach]['desc']} (+{achievements[ach]['xp']} XP)")
     if not st.session_state.achievements:
@@ -569,7 +569,7 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
     body {
-        font-family: 'Press Start 2P', cursive;
+        font-family: 'Press+Start+2P', cursive;
         background: linear-gradient(to bottom, #2a2a2a, #4a4a4a);
         background-image: url('https://www.transparenttextures.com/patterns/dark-mosaic.png');
         background-size: cover;
@@ -587,7 +587,7 @@ st.markdown("""
         color: #f0f0f0;
         border: 2px solid #ffffff;
         padding: 12px 24px;
-        font-family: 'Press Start 2P', cursive;
+        font-family: 'Press+Start+2P', cursive;
         border-radius: 5px;
         transition: all 0.3s ease;
     }
@@ -623,7 +623,7 @@ st.markdown("""
         background-color: #404040;
         color: #f0f0f0;
         border: 1px solid #ffffff;
-        font-family: 'Press Start 2P', cursive;
+        font-family: 'Press+Start+2P', cursive;
         border-radius: 5px;
     }
     .stSidebar {

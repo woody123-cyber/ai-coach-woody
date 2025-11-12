@@ -197,7 +197,7 @@ tab1, tab2, tab3 = st.tabs(["Fitness Coach", "Nutrition Coach", "Speaking Quest"
 # TAB 1: FITNESS COACH
 # ========================================
 with tab1:
-    st.title(f"{coach_name} — Fitness Mode# Fitness Coach")
+    st.title(f"{coach_name} — Fitness Mode")
     fitness_prompt = f"""
     You are {coach_name}, {'motivational strength coach' if gender == 'Male (Woody)' else 'graceful, empowering trainer'}.
     Be fun, encouraging, under 120 words. Use emojis.
@@ -420,7 +420,7 @@ with tab3:
     col3.metric("Streak", f"{st.session_state.streak} days")
     progress = min(st.session_state.xp / 100, 1.0)
     st.progress(progress)
-    st.caption Says: st.caption(f"**Band {st.session_state.last_band:.1f}** → Next Level: {st.session_state.level + 1}")
+    st.caption(f"**Band {st.session_state.last_band:.1f}** → Next Level: {st.session_state.level + 1}")
     languages = {
         "English": "English", "中文": "Chinese", "Español": "Spanish", "हिन्दी": "Hindi",
         "العربية": "Arabic", "Português": "Portuguese", "বাংলা": "Bengali", "Русский": "Russian",

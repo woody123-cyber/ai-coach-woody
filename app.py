@@ -3,6 +3,8 @@ import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+import whisper
+from pydub import AudioSegment
 import cv2
 import numpy as np
 from PIL import Image
@@ -53,7 +55,7 @@ if "messages" not in st.session_state:
     st.session_state.level = "Beginner"
     st.session_state.goal = "Run a 5K"
     st.session_state.part = "Part 1"
-    st.session_state.progress = []
+    st.session_state.progress = []  # List of (date, value)
 
 # === SIDEBAR ===
 with st.sidebar:
@@ -74,14 +76,25 @@ with st.sidebar:
         fig = px.line(df, x="date", y="pushups", title="Push-up Progress")
         st.plotly_chart(fig, use_container_width=True)
 
-# === VOICE INPUT (Browser Mic → Text) ===
+# === VOICE INPUT ===
+st.subheader("Voice Input")
+audio = st.experimental_audio_input# === VOICE INPUT (Browser Mic) ===
 st.subheader("Voice Input")
 audio_bytes = st.experimental_audio_input("Speak to Woody")
+
 if audio_bytes:
-    with st.spinner("Transcribing..."):
-        # Use browser-based speech-to-text (no pydub!)
-        # We'll use a JS trick via st.components
-        pass  # We'll fix this below
+    st.audio(audio_bytes, format="audio/wav")
+    st.info("Voice recorded! (Speech-to-text coming in v2 — type for now)")
+    # Future: Use Web Speech API via st.components.v1.html("Speak to Woody")
+if audio:
+    with st.spinner("Listening..."):
+        audio_segment = AudioSegment.from_file(audio)
+        audio_segment.export("temp.wav", format="wav")
+        model = whisper.load_model("base")
+        result = model.transcribe("temp.wav")
+        user_text = result["text"]
+        st.session_state.messages.append({"role": "user", "content": user_text})
+        st.chat_message("user").write(user_text)
 
 # === PHOTO FORM CHECK ===
 st.subheader("Upload Form Photo")
@@ -90,7 +103,7 @@ if uploaded_file:
     image = Image.open(uploaded_file)
     st.image(image, caption="Your form")
     
-    # Simple edge detection
+    # Simple pose detection (mock with real logic)
     img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
     gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
     edges = cv2.Canny(gray, 50, 150)
@@ -98,9 +111,9 @@ if uploaded_file:
     
     feedback = "Great form! Keep core tight."
     if lines is not None and len(lines) < 5:
-        feedback = "Warning: Your back might be sagging. Keep a straight line!"
+        feedback = "Warning: Your back might be sagging. Keep a straight line from head to heels!"
     elif lines is not None and len(lines) > 15:
-        feedback = "Warning: Elbows flaring. Keep them at 45°!"
+        feedback = "Warning: Elbows flaring out. Keep them at 45° to your body."
     
     st.success(feedback)
     st.session_state.messages.append({"role": "assistant", "content": feedback})

@@ -128,7 +128,22 @@ if "initialized" not in st.session_state:
             "cycle_static": {"level": 1, "xp": 0},
             "stretch": {"level": 1, "xp": 0},
             "hiit": {"level": 1, "xp": 0},
-            "meal_log": {"level": 1, "xp": 0}
+            "meal_log": {"level": 1, "xp": 0},
+            "bench_press": {"level": 1, "xp": 0},
+            "deadlift": {"level": 1, "xp": 0},
+            "shoulder_press": {"level": 1, "xp": 0},
+            "bicep_curls": {"level": 1, "xp": 0},
+            "tricep_dips": {"level": 1, "xp": 0},
+            "leg_press": {"level": 1, "xp": 0},
+            "yoga": {"level": 1, "xp": 0},
+            "pilates": {"level": 1, "xp": 0},
+            "swimming": {"level": 1, "xp": 0},
+            "rowing": {"level": 1, "xp": 0},
+            "jump_rope": {"level": 1, "xp": 0},
+            "burpees": {"level": 1, "xp": 0},
+            "mountain_climbers": {"level": 1, "xp": 0},
+            "kettlebell_swings": {"level": 1, "xp": 0},
+            "battle_ropes": {"level": 1, "xp": 0}
         },
         "achievements": [],
         "quest_streak": 0,
@@ -163,6 +178,19 @@ def get_avatar_title(level):
         with open("error_log.txt", "a") as f:
             f.write(f"{datetime.now()}: Error in get_avatar_title: {str(e)}\n")
         return "Novice Warrior"
+
+def get_avatar_image(level):
+    # Simple text-based avatar that "grows muscles" with level
+    if level < 3:
+        return "Skinny Avatar"
+    elif level < 5:
+        return "Fit Avatar"
+    elif level < 10:
+        return "Muscular Avatar"
+    elif level < 15:
+        return "Buff Avatar"
+    else:
+        return "Ultra Muscular Hero"
 
 def get_ability(level):
     abilities = {
@@ -240,14 +268,33 @@ met_values = {
     "cycle_outdoor": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
     "cycle_static": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
     "stretch": {"Low": 2.0, "Medium": 2.5, "High": 3.0},
-    "hiit": {"Low": 6.0, "Medium": 8.0, "High": 10.0}
+    "hiit": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
+    "bench_press": {"Low": 5.0, "Medium": 7.0, "High": 9.0},
+    "deadlift": {"Low": 5.0, "Medium": 7.0, "High": 9.0},
+    "shoulder_press": {"Low": 5.0, "Medium": 7.0, "High": 9.0},
+    "bicep_curls": {"Low": 4.0, "Medium": 6.0, "High": 8.0},
+    "tricep_dips": {"Low": 4.0, "Medium": 6.0, "High": 8.0},
+    "leg_press": {"Low": 5.0, "Medium": 7.0, "High": 9.0},
+    "yoga": {"Low": 2.5, "Medium": 3.5, "High": 4.5},
+    "pilates": {"Low": 3.0, "Medium": 4.0, "High": 5.0},
+    "swimming": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
+    "rowing": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
+    "jump_rope": {"Low": 8.0, "Medium": 10.0, "High": 12.0},
+    "burpees": {"Low": 7.0, "Medium": 9.0, "High": 11.0},
+    "mountain_climbers": {"Low": 7.0, "Medium": 9.0, "High": 11.0},
+    "kettlebell_swings": {"Low": 6.0, "Medium": 8.0, "High": 10.0},
+    "battle_ropes": {"Low": 8.0, "Medium": 10.0, "High": 12.0}
 }
 
 skill_icons = {
     "push_ups": "Flexed Biceps", "pull_ups": "Lifting Weights", "sit_ups": "Person in Lotus Position", "squats": "Leg",
     "plank": "Hammer and Wrench", "run": "Running", "walk_outdoor": "Walking", "walk_treadmill": "Running Shoe",
     "cycle_outdoor": "Bicyclist", "cycle_static": "Stationary Bike", "stretch": "Gymnastics", "hiit": "Fire",
-    "meal_log": "Plate with Cutlery"
+    "meal_log": "Plate with Cutlery", "bench_press": "Bench Press", "deadlift": "Deadlift",
+    "shoulder_press": "Shoulder Press", "bicep_curls": "Bicep Curls", "tricep_dips": "Tricep Dips",
+    "leg_press": "Leg Press", "yoga": "Yoga", "pilates": "Pilates", "swimming": "Swimming",
+    "rowing": "Rowing", "jump_rope": "Jump Rope", "burpees": "Burpees", "mountain_climbers": "Mountain Climbers",
+    "kettlebell_swings": "Kettlebell Swings", "battle_ropes": "Battle Ropes"
 }
 
 skill_desc = {
@@ -263,7 +310,22 @@ skill_desc = {
     "cycle_static": "Pedal to greatness! +10% XP at Level 10.",
     "stretch": "Stay limber and ready! +10% XP at Level 10.",
     "hiit": "Unleash explosive energy! +10% XP at Level 10.",
-    "meal_log": "Fuel your body wisely! +10% XP at Level 10."
+    "meal_log": "Fuel your body wisely! +10% XP at Level 10.",
+    "bench_press": "Build chest strength! +10% XP at Level 10.",
+    "deadlift": "Master back and leg power! +10% XP at Level 10.",
+    "shoulder_press": "Strengthen shoulders! +10% XP at Level 10.",
+    "bicep_curls": "Grow arm muscles! +10% XP at Level 10.",
+    "tricep_dips": "Tone triceps! +10% XP at Level 10.",
+    "leg_press": "Power up legs! +10% XP at Level 10.",
+    "yoga": "Improve flexibility and balance! +10% XP at Level 10.",
+    "pilates": "Core and posture enhancement! +10% XP at Level 10.",
+    "swimming": "Full body cardio! +10% XP at Level 10.",
+    "rowing": "Back and cardio workout! +10% XP at Level 10.",
+    "jump_rope": "High-intensity cardio! +10% XP at Level 10.",
+    "burpees": "Full body explosive exercise! +10% XP at Level 10.",
+    "mountain_climbers": "Core and cardio burner! +10% XP at Level 10.",
+    "kettlebell_swings": "Hip and core power! +10% XP at Level 10.",
+    "battle_ropes": "Upper body endurance! +10% XP at Level 10."
 }
 
 # === ACHIEVEMENTS ===
@@ -276,13 +338,14 @@ achievements = {
 }
 
 # === XP SYSTEM ===
-def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Medium"):
+def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Medium", difficulty="Beginner"):
     xp_gain = 10
     intensity_multipliers = {"Low": 1.0, "Medium": 1.5, "High": 2.0}
-    xp_gain *= intensity_multipliers[intensity]
-    if workout_type in ["push_ups", "pull_ups", "sit_ups", "squats", "plank", "hiit", "stretch"]:
+    difficulty_multipliers = {"Beginner": 1.0, "Intermediate": 1.2, "Advanced": 1.5}
+    xp_gain *= intensity_multipliers[intensity] * difficulty_multipliers[difficulty]
+    if workout_type in ["push_ups", "pull_ups", "sit_ups", "squats", "plank", "hiit", "stretch", "bench_press", "deadlift", "shoulder_press", "bicep_curls", "tricep_dips", "leg_press", "burpees", "mountain_climbers", "kettlebell_swings", "battle_ropes"]:
         xp_gain += reps // 5 if reps > 0 else time_min // 5
-    elif workout_type in ["run", "walk_outdoor", "cycle_outdoor"]:
+    elif workout_type in ["run", "walk_outdoor", "cycle_outdoor", "swimming", "rowing", "jump_rope"]:
         xp_gain += int(distance * 3)
     elif workout_type in ["walk_treadmill", "cycle_static"]:
         xp_gain += time_min // 5
@@ -292,7 +355,7 @@ def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Me
     st.session_state.total_xp += xp_gain
     st.session_state.xp_history.append({
         "date": datetime.now().strftime("%Y-%m-%d"),
-        "source": f"{workout_type} ({intensity})",
+        "source": f"{workout_type} ({intensity}, {difficulty})",
         "xp": xp_gain
     })
     save_user_data()
@@ -418,6 +481,7 @@ with st.sidebar:
             st.success(f"Welcome, {name}!")
             save_user_data()
     st.markdown(f"**Avatar**: {get_avatar_title(st.session_state.level)}")
+    st.markdown(f"**Appearance**: {get_avatar_image(st.session_state.level)}")
     if st.session_state.gear:
         st.markdown(f"**Gear**: {', '.join(st.session_state.gear)}")
     else:
@@ -468,6 +532,24 @@ with st.sidebar:
         st.markdown(f"**{achievements[ach]['name']}**: {achievements[ach]['desc']} (+{achievements[ach]['xp']} XP)")
     if not st.session_state.achievements:
         st.info("No achievements yet. Complete quests to earn some!")
+    # Progress bars for some achievements
+    if "weekly_warrior" not in st.session_state.achievements:
+        df = pd.DataFrame(st.session_state.progress_fitness)
+        if not df.empty:
+            df["date"] = pd.to_datetime(df["date"])
+            week_start = datetime.now() - pd.Timedelta(days=datetime.now().weekday())
+            week_logs = df[df["date"] >= week_start]
+            current_week_workouts = len(week_logs["date"].dt.date.unique())
+            st.markdown("Weekly Warrior Progress")
+            st.progress(current_week_workouts / 3)
+    if "quest_master" not in st.session_state.achievements:
+        current_streak = st.session_state.get("quest_streak", 0)
+        st.markdown("Quest Master Progress")
+        st.progress(current_streak / 5)
+    if "epic_questor" not in st.session_state.achievements:
+        current_streak = st.session_state.get("quest_streak", 0)
+        st.markdown("Epic Questor Progress")
+        st.progress(current_streak / 10)
 
 # === LLM INVOCATION ===
 def chain_invoke(chain, history, user_input):
@@ -492,7 +574,6 @@ def chain_invoke(chain, history, user_input):
         return "Sorry, I couldn't generate a response. Please try again."
 
 # === TOP BAR (HUD) ===
-st.markdown("### Cyberpunk HUD")
 col1, col2 = st.columns([1, 3])
 with col1:
     try:
@@ -520,12 +601,6 @@ with col1:
     total_burned = st.session_state.bmr + total_burned_workouts
     total_consumed = today_nutrition["calories"].sum() if not today_nutrition.empty else 0
     net_calories = total_consumed - total_burned
-    health = max(0, min(1, (net_calories + 1000) / 2000))
-    st.markdown("**Health**")
-    st.progress(health)
-    mana = min(1, st.session_state.bmr / 3000)
-    st.markdown("**Mana**")
-    st.progress(mana)
 with col2:
     st.markdown(f"**Mission Log**: Streak: {st.session_state.get('quest_streak', 0)} Days Fire")
 
@@ -597,17 +672,30 @@ with st.expander("Training Grounds"):
     workout = st.selectbox("Workout Type", [
         "Push-ups", "Pull-ups", "Sit-ups", "Squats", "Plank", "Run",
         "Walk (Outdoor)", "Walk (Treadmill)", "Cycle (Outdoor)", "Cycle (Static Bike)",
-        "Stretch", "HIIT"
+        "Stretch", "HIIT", "Bench Press", "Deadlift", "Shoulder Press", "Bicep Curls",
+        "Tricep Dips", "Leg Press", "Yoga", "Pilates", "Swimming", "Rowing",
+        "Jump Rope", "Burpees", "Mountain Climbers", "Kettlebell Swings", "Battle Ropes"
     ])
     intensity = st.selectbox("Intensity", ["Low", "Medium", "High"])
-    if workout in ["Push-ups", "Pull-ups", "Sit-ups", "Squats"]:
+    difficulty = st.selectbox("Difficulty", ["Beginner", "Intermediate", "Advanced"])
+    if workout in ["Push-ups", "Pull-ups", "Sit-ups", "Squats", "Bench Press", "Deadlift", "Shoulder Press", "Bicep Curls", "Tricep Dips", "Leg Press", "Burpees", "Mountain Climbers", "Kettlebell Swings", "Battle Ropes"]:
         variations = {
             "Push-ups": ["Normal", "Close-Grip", "Wide-Grip"],
             "Pull-ups": ["Normal", "Chin-ups", "Neutral-Grip"],
             "Sit-ups": ["Standard", "Russian Twists", "Leg Raises"],
-            "Squats": ["Bodyweight", "Goblet", "Sumo"]
+            "Squats": ["Bodyweight", "Goblet", "Sumo"],
+            "Bench Press": ["Barbell", "Dumbbell", "Incline"],
+            "Deadlift": ["Conventional", "Sumo", "Romanian"],
+            "Shoulder Press": ["Overhead", "Seated", "Arnold"],
+            "Bicep Curls": ["Barbell", "Dumbbell", "Hammer"],
+            "Tricep Dips": ["Bench", "Parallel Bars", "Ring"],
+            "Leg Press": ["Standard", "Single Leg", "Wide Stance"],
+            "Burpees": ["Standard", "With Push-up", "Box Jump"],
+            "Mountain Climbers": ["Standard", "Cross Body", "Slow Tempo"],
+            "Kettlebell Swings": ["Two-Handed", "Single-Handed", "American"],
+            "Battle Ropes": ["Waves", "Slams", "Circles"]
         }
-        variation = st.selectbox("Variation", variations[workout])
+        variation = st.selectbox("Variation", variations.get(workout, ["Standard"]))
         reps = st.number_input("Reps", min_value=0, value=0)
         time_min = st.number_input("Time (min)", min_value=0.0, value=5.0, step=0.1)
         if st.button("Log Training"):
@@ -618,29 +706,232 @@ with st.expander("Training Grounds"):
                 "variation": variation,
                 "reps": reps,
                 "intensity": intensity,
+                "difficulty": difficulty,
                 "time": time_min
             }
             met = met_values.get(type_lower, {"Medium": 4.0}).get(intensity, 4.0)
             calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
-            xp_gain = award_fitness_xp(type_lower, reps=reps, intensity=intensity)
+            xp_gain = award_fitness_xp(type_lower, reps=reps, intensity=intensity, difficulty=difficulty)
             if reps > 0:
                 award_skill_xp(type_lower, reps)
-                st.success(f"Trained {reps} {variation} {workout.lower()} ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{reps} {workout} Skill XP")
+                st.success(f"Trained {reps} {variation} {workout.lower()} ({intensity}, {difficulty})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{reps} {workout} Skill XP")
             else:
                 st.warning("Enter at least 1 rep to earn skill XP.")
             save_user_data()
             check_achievements()
-    # ... [rest of training sections unchanged for brevity, same as before] ...
+    elif workout == "Plank":
+        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
+        if st.button("Log Plank"):
+            if time_min > 0:
+                entry = {
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "type": "plank",
+                    "time": time_min,
+                    "intensity": intensity,
+                    "difficulty": difficulty
+                }
+                met = met_values.get("plank", {"Medium": 4.0}).get(intensity, 4.0)
+                calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
+                entry["calories_burned"] = int(calories_burned)
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("plank", time_min=time_min, intensity=intensity, difficulty=difficulty)
+                award_skill_xp("plank", int(time_min))
+                save_user_data()
+                st.success(f"Trained {time_min} min plank ({intensity}, {difficulty})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Plank Skill XP")
+                check_achievements()
+    elif workout == "Run":
+        distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
+        time_min = st.number_input("Time (min)", min_value=0)
+        if st.button("Log Run"):
+            if distance > 0 and time_min > 0:
+                pace = round(time_min / distance, 2)
+                entry = {
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "type": "run",
+                    "distance": distance,
+                    "time": time_min,
+                    "pace": pace,
+                    "intensity": intensity,
+                    "difficulty": difficulty
+                }
+                met = met_values.get("run", {"Medium": 8.0}).get(intensity, 8.0)
+                calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
+                entry["calories_burned"] = int(calories_burned)
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("run", distance=distance, intensity=intensity, difficulty=difficulty)
+                award_skill_xp("run", int(distance))
+                save_user_data()
+                st.success(f"Trained {distance}km run ({intensity}, {difficulty})! Pace: {pace} min/km | Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Run Skill XP")
+                check_achievements()
+    elif workout == "Walk (Outdoor)":
+        distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
+        time_min = st.number_input("Time (min)", min_value=0)
+        terrain = st.selectbox("Terrain", ["Flat", "Hilly", "Mixed"])
+        if st.button("Log Walk"):
+            if distance > 0:
+                entry = {
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "type": "walk_outdoor",
+                    "distance": distance,
+                    "time": time_min,
+                    "terrain": terrain,
+                    "intensity": intensity,
+                    "difficulty": difficulty
+                }
+                met = met_values.get("walk_outdoor", {"Medium": 4.0}).get(intensity, 4.0)
+                calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
+                entry["calories_burned"] = int(calories_burned)
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("walk_outdoor", distance=distance, intensity=intensity, difficulty=difficulty)
+                award_skill_xp("walk_outdoor", int(distance))
+                save_user_data()
+                st.success(f"Trained {distance}km walk ({intensity}, {difficulty})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Walk Outdoor Skill XP")
+                check_achievements()
+    elif workout == "Walk (Treadmill)":
+        speed = st.number_input("Speed (km/h)", min_value=0.0, step=0.1)
+        incline = st.number_input("Incline (%)", min_value=0.0, step=0.5)
+        time_min = st.number_input("Time (min)", min_value=0)
+        if st.button("Log Treadmill"):
+            if time_min > 0:
+                distance = round(speed * (time_min / 60), 2)
+                entry = {
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "type": "walk_treadmill",
+                    "distance": distance,
+                    "time": time_min,
+                    "speed": speed,
+                    "incline": incline,
+                    "intensity": intensity,
+                    "difficulty": difficulty
+                }
+                met = met_values.get("walk_treadmill", {"Medium": 4.0}).get(intensity, 4.0)
+                calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
+                entry["calories_burned"] = int(calories_burned)
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("walk_treadmill", time_min=time_min, intensity=intensity, difficulty=difficulty)
+                award_skill_xp("walk_treadmill", int(time_min))
+                save_user_data()
+                st.success(f"Trained {distance}km treadmill ({intensity}, {difficulty})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Walk Treadmill Skill XP")
+                check_achievements()
+    elif workout == "Cycle (Outdoor)":
+        distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
+        time_min = st.number_input("Time (min)", min_value=0)
+        if st.button("Log Cycle"):
+            if distance > 0 and time_min > 0:
+                speed = round(distance / (time_min / 60), 1)
+                entry = {
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "type": "cycle_outdoor",
+                    "distance": distance,
+                    "time": time_min,
+                    "avg_speed": speed,
+                    "intensity": intensity,
+                    "difficulty": difficulty
+                }
+                met = met_values.get("cycle_outdoor", {"Medium": 8.0}).get(intensity, 8.0)
+                calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
+                entry["calories_burned"] = int(calories_burned)
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("cycle_outdoor", distance=distance, intensity=intensity, difficulty=difficulty)
+                award_skill_xp("cycle_outdoor", int(distance))
+                save_user_data()
+                st.success(f"Trained {distance}km cycle ({intensity}, {difficulty})! Speed: {speed} km/h | Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Cycle Outdoor Skill XP")
+                check_achievements()
+    elif workout == "Cycle (Static Bike)":
+        time_min = st.number_input("Time (min)", min_value=0)
+        resistance = st.slider("Resistance", 1, 20, 10)
+        rpm = st.number_input("Avg RPM", min_value=0, value=70)
+        if st.button("Log Static Bike"):
+            if time_min > 0:
+                entry = {
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "type": "cycle_static",
+                    "time": time_min,
+                    "resistance": resistance,
+                    "rpm": rpm,
+                    "intensity": intensity,
+                    "difficulty": difficulty
+                }
+                met = met_values.get("cycle_static", {"Medium": 8.0}).get(intensity, 8.0)
+                calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
+                entry["calories_burned"] = int(calories_burned)
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("cycle_static", time_min=time_min, intensity=intensity, difficulty=difficulty)
+                award_skill_xp("cycle_static", int(time_min))
+                save_user_data()
+                st.success(f"Trained {time_min} min static bike ({intensity}, {difficulty})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Cycle Static Skill XP")
+                check_achievements()
+    elif workout == "Stretch":
+        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
+        if st.button("Log Stretch"):
+            if time_min > 0:
+                entry = {
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "type": "stretch",
+                    "time": time_min,
+                    "intensity": intensity,
+                    "difficulty": difficulty
+                }
+                met = met_values.get("stretch", {"Medium": 2.5}).get(intensity, 2.5)
+                calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
+                entry["calories_burned"] = int(calories_burned)
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("stretch", time_min=time_min, intensity=intensity, difficulty=difficulty)
+                award_skill_xp("stretch", int(time_min))
+                save_user_data()
+                st.success(f"Trained {time_min} min stretch ({intensity}, {difficulty})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Stretch Skill XP")
+                check_achievements()
+    elif workout == "HIIT":
+        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
+        if st.button("Log HIIT"):
+            if time_min > 0:
+                entry = {
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "type": "hiit",
+                    "time": time_min,
+                    "intensity": intensity,
+                    "difficulty": difficulty
+                }
+                met = met_values.get("hiit", {"Medium": 8.0}).get(intensity, 8.0)
+                calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
+                entry["calories_burned"] = int(calories_burned)
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("hiit", time_min=time_min, intensity=intensity, difficulty=difficulty)
+                award_skill_xp("hiit", int(time_min))
+                save_user_data()
+                st.success(f"Trained {time_min} min HIIT ({intensity}, {difficulty})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} HIIT Skill XP")
+                check_achievements()
+    elif workout == "Yoga":
+        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
+        if st.button("Log Yoga"):
+            if time_min > 0:
+                entry = {
+                    "date": datetime.now().strftime("%Y-%m-%d"),
+                    "type": "yoga",
+                    "time": time_min,
+                    "intensity": intensity,
+                    "difficulty": difficulty
+                }
+                met = met_values.get("yoga", {"Medium": 3.5}).get(intensity, 3.5)
+                calories_burned = met * st.session_state.body_weight_kg * (time_min / 60)
+                entry["calories_burned"] = int(calories_burned)
+                st.session_state.progress_fitness.append(entry)
+                xp_gain = award_fitness_xp("yoga", time_min=time_min, intensity=intensity, difficulty=difficulty)
+                award_skill_xp("yoga", int(time_min))
+                save_user_data()
+                st.success(f"Trained {time_min} min yoga ({intensity}, {difficulty})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Yoga Skill XP")
+                check_achievements()
+    # Add similar blocks for other new activities like Pilates, Swimming, etc.
 
     # Log Nutrition
     st.subheader("Refuel Your Body")
     meal = st.selectbox("Meal Type", ["Breakfast", "Lunch", "Dinner", "Snack"])
-    calories = st.number_input("Calories", min_value=0, value=0)
-    protein = st.number_input("Protein (g)", min_value=0, value=0)
-    carbs = st.number_input("Carbs (g)", min_value=0, value=0)
-    fats = st.number_input("Fats (g)", min_value=0, value=0)
+    calories = st.number_input("Calories", min_value=0, value=0, step=10)
+    protein = st.number_input("Protein (g)", min_value=0, value=0, step=10)
+    carbs = st.number_input("Carbs (g)", min_value=0, value=0, step=10)
+    fats = st.number_input("Fats (g)", min_value=0, value=0, step=10)
     if st.button("Log Meal"):
         entry = {
             "date": datetime.now().strftime("%Y-%m-%d"),
@@ -673,14 +964,23 @@ with st.expander("Training Grounds"):
 # === SKILL TREE EXPANDER ===
 with st.expander("Skill Matrix"):
     st.subheader("Your Abilities")
-    for key, value in st.session_state.skill_levels.items():
-        skill_name = key.replace("_", " ").title()
-        level = value["level"]
-        xp = value["xp"]
-        required_xp = 100 + 50 * (level - 1)
-        badge = " Master" if level >= 10 else ""
-        st.markdown(f"**{skill_icons.get(key, 'Star')} {skill_name}: Level {level}{badge}** ({xp}/{required_xp} XP)")
-        st.progress(min(xp / required_xp, 1.0))
+    categories = {
+        "Cardio": ["run", "walk_outdoor", "walk_treadmill", "cycle_outdoor", "cycle_static", "hiit", "swimming", "rowing", "jump_rope", "burpees", "mountain_climbers", "battle_ropes"],
+        "Strength": ["push_ups", "pull_ups", "sit_ups", "squats", "plank", "bench_press", "deadlift", "shoulder_press", "bicep_curls", "tricep_dips", "leg_press", "kettlebell_swings"],
+        "Stretching": ["stretch", "yoga", "pilates"]
+    }
+    for cat, skills in categories.items():
+        st.markdown(f"### {cat}")
+        for key in skills:
+            if key in st.session_state.skill_levels:
+                value = st.session_state.skill_levels[key]
+                skill_name = key.replace("_", " ").title()
+                level = value["level"]
+                xp = value["xp"]
+                required_xp = 100 + 50 * (level - 1)
+                badge = " Master" if level >= 10 else ""
+                st.markdown(f"**{skill_icons.get(key, 'Star')} {skill_name}: Level {level}{badge}** ({xp}/{required_xp} XP)")
+                st.progress(min(xp / required_xp, 1.0))
 
 # === COACH WOODY EXPANDER ===
 with st.expander("Command Center"):

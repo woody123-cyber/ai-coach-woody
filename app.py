@@ -33,14 +33,54 @@ except Exception as e:
 DATA_FILE = "user_data.json"
 
 def load_user_data():
-    if os.path.exists(DATA_FILE):
+    if not os.path.exists(DATA_FILE):
+        return {}
+    try:
         with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    return {}
+            data = json.load(f)
+            # Validate expected keys and types
+            expected_keys = {
+                "messages": list, "level": int, "xp": int, "total_xp": int,
+                "last_band": float, "streak": int, "progress_fitness": list,
+                "progress_nutrition": list, "name": str, "body_weight_kg": float,
+                "weight_unit": str, "weight_goal": str, "calorie_goal": int,
+                "macro_goal": dict, "home_lang": str, "part": str,
+                "fitness_starters": list, "nutrition_starters": list,
+                "question_history": list, "onboarded": bool, "quick_prompt": (str, type(None))
+            }
+            valid_data = {}
+            for key, expected_type in expected_keys.items():
+                if key in data and isinstance(data[key], expected_type):
+                    valid_data[key] = data[key]
+                else:
+                    with open("error_log.txt", "a") as f:
+                        f.write(f"{datetime.now()}: Invalid {key} in user_data.json\n")
+            return valid_data
+    except json.JSONDecodeError as e:
+        with open("error_log.txt", "a") as f:
+            f.write(f"{datetime.now()}: Failed to decode user_data.json: {str(e)}\n")
+        return {}
+    except Exception as e:
+        with open("error_log.txt", "a") as f:
+            f.write(f"{datetime.now()}: Error loading user_data.json: {str(e)}\n")
+        return {}
 
 def save_user_data():
-    with open(DATA_FILE, "w") as f:
-        json.dump(st.session_state, f, default=str)
+    # Only save relevant session state keys
+    keys_to_save = [
+        "messages", "level", "xp", "total_xp", "last_band", "streak",
+        "progress_fitness", "progress_nutrition", "name", "body_weight_kg",
+        "weight_unit", "weight_goal", "calorie_goal", "macro_goal",
+        "home_lang", "part", "fitness_starters", "nutrition_starters",
+        "question_history", "onboarded", "quick_prompt"
+    ]
+    data = {k: st.session_state.get(k) for k in keys_to_save if k in st.session_state}
+    try:
+        with open(DATA_FILE, "w") as f:
+            json.dump(data, f, default=lambda o: str(o) if not isinstance(o, (str, int, float, bool, list, dict, type(None))) else o)
+    except Exception as e:
+        with open("error_log.txt", "a") as f:
+            f.write(f"{datetime.now()}: Error saving user_data.json: {str(e)}\n")
 
 # Initialize session state
 if "initialized" not in st.session_state:
@@ -78,8 +118,14 @@ if "initialized" not in st.session_state:
         "quick_prompt": None
     }
     for key, value in defaults.items():
-        st.session_state[key] = user_data.get(key, value)
+        try:
+            st.session_state[key] = user_data.get(key, value)
+        except AttributeError as e:
+            with open("error_log.txt", "a") as f:
+                f.write(f"{datetime.now()}: AttributeError for key {key}: {str(e)}\n")
+            st.session_state[key] = value
     st.session_state["initialized"] = True
+    save_user_data()
 
 # === ONBOARDING ===
 if not st.session_state.get("onboarded", False):

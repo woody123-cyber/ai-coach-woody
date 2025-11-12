@@ -87,4 +87,6 @@ if uploaded_file:
     lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=100, minLineLength=100, maxLineGap=10)
     
     feedback = "Great form! Keep core tight."
-    if
+    if lines is not None and len(lines) < 5:
+        feedback = "Warning: Your back might be sagging. Keep a straight line!"
+    elif lines is not None and len(lines) > 15

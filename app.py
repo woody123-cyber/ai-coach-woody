@@ -147,17 +147,22 @@ if "initialized" not in st.session_state:
 
 # === AVATAR & GEAR SYSTEM ===
 def get_avatar_title(level):
-    titles = {
-        1: "Novice Warrior",
-        3: "Apprentice Fighter",
-        5: "Skilled Soldier",
-        10: "Master Athlete",
-        15: "Legendary Hero"
-    }
-    for lvl, title in sorted(titles.items(), reverse=True):
-        if level >= lvl:
-            return title
-    return "Novice Warrior"
+    try:
+        titles = {
+            1: "Novice Warrior",
+            3: "Apprentice Fighter",
+            5: "Skilled Soldier",
+            10: "Master Athlete",
+            15: "Legendary Hero"
+        }
+        for lvl, title in sorted(titles.items(), reverse=True):
+            if level >= lvl:
+                return title
+        return "Novice Warrior"
+    except Exception as e:
+        with open("error_log.txt", "a") as f:
+            f.write(f"{datetime.now()}: Error in get_avatar_title: {str(e)}\n")
+        return "Novice Warrior"
 
 def get_ability(level):
     abilities = {
@@ -443,7 +448,7 @@ if not st.session_state.get("onboarded", False):
 
 # === SIDE BAR ===
 with st.sidebar:
-    st.subheader("⚙️ Hero Stats")  # Removed key="hero-stats"
+    st.subheader("⚙️ Hero Stats")
     if not st.session_state.name:
         name = st.text_input("Your Name", placeholder="Jake", key="name-input")
         if name:
@@ -489,14 +494,14 @@ with st.sidebar:
         st.success(f"Done! BMR: {st.session_state.bmr} cal | Daily Calories: {int(calories)} cal")
         save_user_data()
     st.divider()
-    st.subheader("🛡️ Guild")  # Removed key="guild-header"
+    st.subheader("🛡️ Guild")
     guilds = ["", "Strength Warriors", "Endurance Runners", "Flexibility Mages"]
     st.session_state.guild = st.selectbox("Join a Guild (+5% XP)", guilds, key="guild-select")
     if st.session_state.guild:
         st.info(f"Guild: {st.session_state.guild}")
     save_user_data()
     st.divider()
-    st.subheader("🏅 Achievements")  # Removed key="achievements-header"
+    st.subheader("🏅 Achievements")
     for ach in st.session_state.achievements:
         st.markdown(f"**{achievements[ach]['name']}**: {achievements[ach]['desc']} (+{achievements[ach]['xp']} XP)")
     if not st.session_state.achievements:
@@ -528,11 +533,19 @@ def chain_invoke(chain, history, user_input):
 st.markdown("<h3 style='text-align: center; color: #f0f0f0;'>🏆 Cyberpunk HUD</h3>", unsafe_allow_html=True)
 col1, col2 = st.columns([1, 3])
 with col1:
-    st.metric("Level", f"{st.session_state.level} ({get_avatar_title(st.session_state.level)})", key="level-metric")
-    required_xp = 100 + 50 * (st.session_state.level - 1)
-    st.metric("XP", f"{st.session_state.xp}/{required_xp}", key="xp-metric")
+    try:
+        level = int(st.session_state.level)
+    except (ValueError, TypeError) as e:
+        level = 1
+        st.session_state.level = 1
+        with open("error_log.txt", "a") as f:
+            f.write(f"{datetime.now()}: Invalid level value: {str(e)}\n")
+    st.metric("Level", level, key="level-display")
+    st.caption(f"Title: {get_avatar_title(level)}")
+    required_xp = 100 + 50 * (level - 1)
+    st.metric("XP", st.session_state.xp, f"{st.session_state.xp}/{required_xp}", key="xp-display")
     st.progress(min(st.session_state.xp / required_xp, 1.0))
-    st.metric("Total XP", st.session_state.total_xp, key="total-xp-metric")
+    st.metric("Total XP", st.session_state.total_xp, key="total-xp-display")
     fitness_df = pd.DataFrame(st.session_state.progress_fitness)
     nutrition_df = pd.DataFrame(st.session_state.progress_nutrition)
     if not fitness_df.empty:
@@ -675,7 +688,7 @@ quest_label = f"📜 Quest Board <span class='alert-badge'>{uncompleted_quests}<
 st.markdown(f"<h2 style='color: #f0f0f0;'>{quest_label}</h2>", unsafe_allow_html=True)
 with st.expander("Mission Briefing", expanded=uncompleted_quests > 0):
     st.info("Complete 5 daily missions to earn XP and glory! Resets at midnight. 🌌")
-    st.metric("Missions Completed", f"{quest_progress}/5", key="quest-metric")
+    st.metric("Missions Completed", quest_progress, f"{quest_progress}/5", key="quest-display")
     for i, quest in st.session_state.daily_quests.items():
         st.markdown(f"**{quest['task']}** (+{quest['xp']} XP) - {quest['desc']}")
         completed = st.checkbox("Mark as Completed", value=quest["completed"], key=f"quest_{i}")
@@ -981,9 +994,9 @@ with st.expander("🏋️ Training Grounds"):
     if st.session_state.progress_fitness or st.session_state.progress_nutrition:
         st.subheader("Energy Matrix")
         col1, col2, col3 = st.columns(3)
-        col1.metric("Consumed Today", int(total_consumed), key="consumed-metric")
-        col2.metric("Burned Today", int(total_burned), key="burned-metric")
-        col3.metric("Net Calories", int(net_calories), key="net-metric")
+        col1.metric("Consumed Today", int(total_consumed), key="consumed-display")
+        col2.metric("Burned Today", int(total_burned), key="burned-display")
+        col3.metric("Net Calories", int(net_calories), key="net-display")
 
 # === SKILL TREE EXPANDER ===
 with st.expander("🌳 Skill Matrix"):

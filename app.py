@@ -135,6 +135,17 @@ if "initialized" not in st.session_state:
             "meal_log": {"level": 1, "xp": 0}
         }
     }
+    # Validate skill_levels from user_data
+    if "skill_levels" in user_data:
+        for skill, data in user_data["skill_levels"].items():
+            if not isinstance(data, dict) or "level" not in data or "xp" not in data:
+                user_data["skill_levels"][skill] = {"level": 1, "xp": 0}
+                with open("error_log.txt", "a") as f:
+                    f.write(f"{datetime.now()}: Reset invalid skill {skill} in user_data.json\n")
+            elif not (1 <= data["level"] <= 60 and data["xp"] >= 0):
+                user_data["skill_levels"][skill] = {"level": 1, "xp": 0}
+                with open("error_log.txt", "a") as f:
+                    f.write(f"{datetime.now()}: Reset out-of-range skill {skill} in user_data.json\n")
     for key, value in defaults.items():
         try:
             st.session_state[key] = user_data.get(key, value)

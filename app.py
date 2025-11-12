@@ -22,7 +22,7 @@ coach_name = "Woody" if gender == "Male (Woody)" else "Hibiki"
 
 # === LLM ===
 try:
-    llm = ChatGroq(model="llama3-8b-8192", api_key=GROQ_API_KEY, temperature=0.7)
+    llm = ChatGroq(model="llama3-70b-8192", api_key=GROQ_API_KEY, temperature=0.7)
 except Exception as e:
     st.error(f"Failed to initialize Groq LLM: {str(e)}")
     with open("error_log.txt", "a") as f:
@@ -177,8 +177,7 @@ def check_level_up():
     save_user_data()
 
 # === LLM INVOCATION ===
-@st.cache_data(ttl=3600)
-def cached_chain_invoke(chain, history, user_input):
+def chain_invoke(chain, history, user_input):
     try:
         response = chain.invoke({"history": history, "input": user_input})
         return response
@@ -241,9 +240,9 @@ with tab1:
                 pace = round(time_min / distance, 2)
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "run", "distance": distance, "time": time_min, "pace": pace}
                 st.session_state.progress_fitness.append(entry)
-            xp_gain = award_fitness_xp("run", distance=distance)
-            save_user_data()
-            st.success(f"Logged {distance}km! Pace: {pace} min/km! +{xp_gain} XP")
+                xp_gain = award_fitness_xp("run", distance=distance)
+                save_user_data()
+                st.success(f"Logged {distance}km! Pace: {pace} min/km! +{xp_gain} XP")
     elif workout == "Walk (Outdoor)":
         distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
         time_min = st.number_input("Time (min)", min_value=0)
@@ -327,7 +326,7 @@ with tab1:
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
-                response = cached_chain_invoke(chain, history, user_prompt)
+                response = chain_invoke(chain, history, user_prompt)
                 st.markdown(response)
                 st.session_state.messages.append({"role": "assistant", "content": response})
                 save_user_data()
@@ -410,7 +409,7 @@ with tab2:
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
-                response = cached_chain_invoke(chain, history, user_prompt)
+                response = chain_invoke(chain, history, user_prompt)
                 st.markdown(response)
                 st.session_state.messages.append({"role": "assistant", "content": response})
                 save_user_data()
@@ -533,7 +532,7 @@ with tab3:
         with st.chat_message("assistant"):
             with st.spinner("Scoring..."):
                 history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
-                response = cached_chain_invoke(chain, history, user_prompt)
+                response = chain_invoke(chain, history, user_prompt)
                 if not practice_mode:
                     band_match = re.search(r"Band[\s:]*([0-9]\.[0-9])", response)
                     band = float(band_match.group(1)) if band_match else 0.0

@@ -109,7 +109,6 @@ with tab1:
     fitness_prompt = f"""
     You are {coach_name}, {'motivational strength coach' if gender == 'Male (Woody)' else 'graceful, empowering trainer'}.
     Be fun, encouraging, under 120 words. Use emojis.
-    User: {st.session_state.level}, Goal: {st.session_state.goal}
     Body weight: {st.session_state.body_weight_kg:.1f}kg
     History: {{history}}
     User: {{input}}

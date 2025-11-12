@@ -157,6 +157,76 @@ if "quests_reset" not in st.session_state:
     reset_daily_quests()
     st.session_state.quests_reset = True
 
+# === XP SYSTEM ===
+def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Medium"):
+    xp_gain = 10
+    intensity_multipliers = {"Low": 1.0, "Medium": 1.5, "High": 2.0}
+    xp_gain *= intensity_multipliers[intensity]
+    if workout_type in ["push_ups", "pull_ups", "sit_ups", "squats", "plank", "hiit", "stretch"]:
+        xp_gain += reps // 5 if reps > 0 else time_min // 5
+    elif workout_type in ["run", "walk_outdoor", "cycle_outdoor"]:
+        xp_gain += int(distance * 3)
+    elif workout_type in ["walk_treadmill", "cycle_static"]:
+        xp_gain += time_min // 5
+    df = pd.DataFrame(st.session_state.progress_fitness)
+    if not df.empty:
+        df["date"] = pd.to_datetime(df["date"])
+        week_start = datetime.now() - pd.Timedelta(days=datetime.now().weekday())
+        week_logs = df[df["date"] >= week_start]
+        unique_days = len(week_logs["date"].dt.date.unique())
+        if unique_days >= 3:
+            xp_gain += 50
+    st.session_state.xp += xp_gain
+    st.session_state.total_xp += xp_gain
+    st.session_state.xp_history.append({
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "source": f"{workout_type} ({intensity})",
+        "xp": xp_gain
+    })
+    save_user_data()
+    check_level_up()
+    return xp_gain
+
+def award_nutrition_xp(calories, protein, carbs, fats):
+    xp_gain = 10
+    balance_score = 100
+    if calories > 0:
+        protein_diff = abs(protein - st.session_state.macro_goal["protein"]) / st.session_state.macro_goal["protein"]
+        carbs_diff = abs(carbs - st.session_state.macro_goal["carbs"]) / st.session_state.macro_goal["carbs"]
+        fats_diff = abs(fats - st.session_state.macro_goal["fats"]) / st.session_state.macro_goal["fats"]
+        balance_score = max(0, 100 - (protein_diff + carbs_diff + fats_diff) * 100 / 3)
+        xp_gain += int(balance_score * 0.15)
+    df = pd.DataFrame(st.session_state.progress_nutrition)
+    if not df.empty:
+        df["date"] = pd.to_datetime(df["date"])
+        last_7_days = df[df["date"] >= datetime.now() - pd.Timedelta(days=7)]
+        daily_totals = last_7_days.groupby(last_7_days["date"].dt.date)["calories"].sum()
+        goal_hits = sum(1 for c in daily_totals if abs(c - st.session_state.calorie_goal) <= 0.1 * st.session_state.calorie_goal)
+        if goal_hits >= 3:
+            xp_gain += 20
+        today = df[df["date"].dt.date == datetime.now().date()]
+        if len(today) >= 3:
+            xp_gain += 10
+    st.session_state.xp += xp_gain
+    st.session_state.total_xp += xp_gain
+    st.session_state.xp_history.append({
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "source": f"Meal Log (Balance Score: {balance_score:.0f}%)",
+        "xp": xp_gain
+    })
+    save_user_data()
+    check_level_up()
+    return xp_gain, balance_score
+
+def check_level_up():
+    required_xp = 100 + 50 * (st.session_state.level - 1)
+    if st.session_state.xp >= required_xp:
+        st.session_state.xp -= required_xp
+        st.session_state.level += 1
+        st.balloons()
+        st.success(f"**LEVEL UP! → Level {st.session_state.level}**")
+        save_user_data()
+
 # === ONBOARDING ===
 if not st.session_state.get("onboarded", False):
     with st.expander("Welcome to Coach Woody!", expanded=True):
@@ -280,76 +350,6 @@ with st.sidebar:
     col2.metric("Carbs", f"{st.session_state.macro_goal['carbs']}g")
     col3.metric("Fats", f"{st.session_state.macro_goal['fats']}g")
 
-# === XP SYSTEM ===
-def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Medium"):
-    xp_gain = 10
-    intensity_multipliers = {"Low": 1.0, "Medium": 1.5, "High": 2.0}
-    xp_gain *= intensity_multipliers[intensity]
-    if workout_type in ["push_ups", "pull_ups", "sit_ups", "squats", "plank", "hiit", "stretch"]:
-        xp_gain += reps // 5 if reps > 0 else time_min // 5
-    elif workout_type in ["run", "walk_outdoor", "cycle_outdoor"]:
-        xp_gain += int(distance * 3)
-    elif workout_type in ["walk_treadmill", "cycle_static"]:
-        xp_gain += time_min // 5
-    df = pd.DataFrame(st.session_state.progress_fitness)
-    if not df.empty:
-        df["date"] = pd.to_datetime(df["date"])
-        week_start = datetime.now() - pd.Timedelta(days=datetime.now().weekday())
-        week_logs = df[df["date"] >= week_start]
-        unique_days = len(week_logs["date"].dt.date.unique())
-        if unique_days >= 3:
-            xp_gain += 50
-    st.session_state.xp += xp_gain
-    st.session_state.total_xp += xp_gain
-    st.session_state.xp_history.append({
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "source": f"{workout_type} ({intensity})",
-        "xp": xp_gain
-    })
-    save_user_data()
-    check_level_up()
-    return xp_gain
-
-def award_nutrition_xp(calories, protein, carbs, fats):
-    xp_gain = 10
-    balance_score = 100
-    if calories > 0:
-        protein_diff = abs(protein - st.session_state.macro_goal["protein"]) / st.session_state.macro_goal["protein"]
-        carbs_diff = abs(carbs - st.session_state.macro_goal["carbs"]) / st.session_state.macro_goal["carbs"]
-        fats_diff = abs(fats - st.session_state.macro_goal["fats"]) / st.session_state.macro_goal["fats"]
-        balance_score = max(0, 100 - (protein_diff + carbs_diff + fats_diff) * 100 / 3)
-        xp_gain += int(balance_score * 0.15)
-    df = pd.DataFrame(st.session_state.progress_nutrition)
-    if not df.empty:
-        df["date"] = pd.to_datetime(df["date"])
-        last_7_days = df[df["date"] >= datetime.now() - pd.Timedelta(days=7)]
-        daily_totals = last_7_days.groupby(last_7_days["date"].dt.date)["calories"].sum()
-        goal_hits = sum(1 for c in daily_totals if abs(c - st.session_state.calorie_goal) <= 0.1 * st.session_state.calorie_goal)
-        if goal_hits >= 3:
-            xp_gain += 20
-        today = df[df["date"].dt.date == datetime.now().date()]
-        if len(today) >= 3:
-            xp_gain += 10
-    st.session_state.xp += xp_gain
-    st.session_state.total_xp += xp_gain
-    st.session_state.xp_history.append({
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "source": f"Meal Log (Balance Score: {balance_score:.0f}%)",
-        "xp": xp_gain
-    })
-    save_user_data()
-    check_level_up()
-    return xp_gain, balance_score
-
-def check_level_up():
-    required_xp = 100 + 50 * (st.session_state.level - 1)
-    if st.session_state.xp >= required_xp:
-        st.session_state.xp -= required_xp
-        st.session_state.level += 1
-        st.balloons()
-        st.success(f"**LEVEL UP! → Level {st.session_state.level}**")
-        save_user_data()
-
 # === LLM INVOCATION ===
 def chain_invoke(chain, history, user_input):
     if not llm:
@@ -422,6 +422,7 @@ if workout in ["Push-ups", "Pull-ups", "Sit-ups", "Squats"]:
         entry["calories_burned"] = int(calories_burned)
         st.session_state.progress_fitness.append(entry)
         xp_gain = award_fitness_xp(type_lower, reps=reps, intensity=intensity)
+        save_user_data()
         st.success(f"Logged {reps} {variation} {workout.lower()} ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Plank":
     time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
@@ -438,6 +439,7 @@ elif workout == "Plank":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("plank", time_min=time_min, intensity=intensity)
+            save_user_data()
             st.success(f"Logged {time_min} min plank ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Run":
     distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
@@ -458,6 +460,7 @@ elif workout == "Run":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("run", distance=distance, intensity=intensity)
+            save_user_data()
             st.success(f"Logged {distance}km run ({intensity})! Pace: {pace} min/km | Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Walk (Outdoor)":
     distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
@@ -478,6 +481,7 @@ elif workout == "Walk (Outdoor)":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("walk_outdoor", distance=distance, intensity=intensity)
+            save_user_data()
             st.success(f"Logged {distance}km walk ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Walk (Treadmill)":
     speed = st.number_input("Speed (km/h)", min_value=0.0, step=0.1)
@@ -500,6 +504,7 @@ elif workout == "Walk (Treadmill)":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("walk_treadmill", time_min=time_min, intensity=intensity)
+            save_user_data()
             st.success(f"Logged {distance}km treadmill ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Cycle (Outdoor)":
     distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
@@ -520,6 +525,7 @@ elif workout == "Cycle (Outdoor)":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("cycle_outdoor", distance=distance, intensity=intensity)
+            save_user_data()
             st.success(f"Logged {distance}km cycle ({intensity})! Speed: {speed} km/h | Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Cycle (Static Bike)":
     time_min = st.number_input("Time (min)", min_value=0)
@@ -540,6 +546,7 @@ elif workout == "Cycle (Static Bike)":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("cycle_static", time_min=time_min, intensity=intensity)
+            save_user_data()
             st.success(f"Logged {time_min} min static bike ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "Stretch":
     time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
@@ -556,6 +563,7 @@ elif workout == "Stretch":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("stretch", time_min=time_min, intensity=intensity)
+            save_user_data()
             st.success(f"Logged {time_min} min stretch ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 elif workout == "HIIT":
     time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
@@ -572,6 +580,7 @@ elif workout == "HIIT":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("hiit", time_min=time_min, intensity=intensity)
+            save_user_data()
             st.success(f"Logged {time_min} min HIIT ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP")
 
 # === NUTRITION SECTION ===
@@ -592,6 +601,7 @@ if st.button("Log Meal"):
     }
     st.session_state.progress_nutrition.append(entry)
     xp_gain, balance_score = award_nutrition_xp(calories, protein, carbs, fats)
+    save_user_data()
     st.success(f"Logged {meal}: {calories} cal (Balance: {balance_score:.0f}%)! +{xp_gain} XP")
 
 # === CALORIE SUMMARY ===

@@ -42,7 +42,7 @@ def load_user_data():
                 "xp_history": list, "daily_quests": dict, "last_quest_date": str,
                 "user_gender": str, "user_age": int, "height_cm": float, "bmr": int,
                 "all_quests_bonus": bool, "skill_levels": dict, "achievements": list,
-                "quest_streak": int
+                "quest_streak": int, "guild": str, "gear": list
             }
             valid_data = {}
             for key, expected_type in expected_keys.items():
@@ -68,7 +68,7 @@ def save_user_data():
         "macro_goal", "fitness_starters", "nutrition_starters", "onboarded",
         "quick_prompt", "xp_history", "daily_quests", "last_quest_date",
         "user_gender", "user_age", "height_cm", "bmr", "all_quests_bonus",
-        "skill_levels", "achievements", "quest_streak"
+        "skill_levels", "achievements", "quest_streak", "guild", "gear"
     ]
     data = {k: st.session_state.get(k) for k in keys_to_save if k in st.session_state}
     try:
@@ -131,7 +131,9 @@ if "initialized" not in st.session_state:
             "meal_log": {"level": 1, "xp": 0}
         },
         "achievements": [],
-        "quest_streak": 0
+        "quest_streak": 0,
+        "guild": "",
+        "gear": []
     }
     for key, value in defaults.items():
         try:
@@ -143,7 +145,7 @@ if "initialized" not in st.session_state:
     st.session_state["initialized"] = True
     save_user_data()
 
-# === AVATAR SYSTEM ===
+# === AVATAR & GEAR SYSTEM ===
 def get_avatar_title(level):
     titles = {
         1: "Novice Warrior",
@@ -159,27 +161,43 @@ def get_avatar_title(level):
 
 def get_ability(level):
     abilities = {
-        5: "🔥 Advanced Form Tip: Keep elbows at 45° during push-ups for max power!",
-        10: "🏋️ Recovery Hack: Foam roll for 10 min post-workout to reduce soreness!",
-        15: "🥗 Nutrition Secret: Pair carbs with protein post-workout for optimal recovery!"
+        5: "🔥 Advanced Form: Elbows at 45° for max push-up power!",
+        10: "🏋️ Recovery Hack: Foam roll 10 min post-workout!",
+        15: "🥗 Nutrition Secret: Pair carbs/protein post-workout!"
     }
     for lvl, ability in sorted(abilities.items(), reverse=True):
         if level >= lvl:
             return ability
     return None
 
+def get_gear(level):
+    gear = {
+        5: "Iron Boots",
+        10: "Steel Gauntlets",
+        15: "Mythril Chestplate"
+    }
+    unlocked = []
+    for lvl, item in sorted(gear.items()):
+        if level >= lvl and item not in st.session_state.gear:
+            st.session_state.gear.append(item)
+            st.success(f"Gear Unlocked: {item}! 🎉")
+            save_user_data()
+        if level >= lvl:
+            unlocked.append(item)
+    return unlocked
+
 # === DAILY QUESTS ===
 quest_pool = [
-    {"task": "Defeat Sloth Beast: 20 push-ups", "xp": 10, "type": "push_ups", "reps": 20, "desc": "Crush laziness with raw strength!"},
-    {"task": "Conquer Gravity: 15 squats", "xp": 10, "type": "squats", "reps": 15, "desc": "Stand tall against the pull!"},
-    {"task": "Sprint the Wasteland: 3 km run", "xp": 15, "type": "run", "distance": 3, "desc": "Outrun the desert storms!"},
-    {"task": "Patrol the Ruins: 5 km walk", "xp": 12, "type": "walk_outdoor", "distance": 5, "desc": "Scout the forgotten paths!"},
-    {"task": "Hold the Line: 1-min plank", "xp": 10, "type": "plank", "time_min": 1, "desc": "Fortify your core defenses!"},
-    {"task": "Climb the Spire: 10 pull-ups", "xp": 15, "type": "pull_ups", "reps": 10, "desc": "Ascend to new heights!"},
-    {"task": "Ride the Storm: 10 km cycle", "xp": 15, "type": "cycle_outdoor", "distance": 10, "desc": "Speed through chaos!"},
-    {"task": "Strike the Core: 20 sit-ups", "xp": 10, "type": "sit_ups", "reps": 20, "desc": "Forge an iron midsection!"},
-    {"task": "Mend the Body: 10 min stretch", "xp": 10, "type": "stretch", "time_min": 10, "desc": "Restore your vitality!"},
-    {"task": "Unleash Fury: 20 min HIIT", "xp": 20, "type": "hiit", "time_min": 20, "desc": "Obliterate all weakness!"}
+    {"task": f"Defeat Sloth Beast #{random.randint(100, 999)}: 20 push-ups", "xp": 10, "type": "push_ups", "reps": 20, "desc": "Crush laziness with raw strength!"},
+    {"task": f"Conquer Gravity #{random.randint(100, 999)}: 15 squats", "xp": 10, "type": "squats", "reps": 15, "desc": "Stand tall against the pull!"},
+    {"task": f"Sprint Wasteland #{random.randint(100, 999)}: 3 km run", "xp": 15, "type": "run", "distance": 3, "desc": "Outrun the desert storms!"},
+    {"task": f"Patrol Ruins #{random.randint(100, 999)}: 5 km walk", "xp": 12, "type": "walk_outdoor", "distance": 5, "desc": "Scout the forgotten paths!"},
+    {"task": f"Hold Line #{random.randint(100, 999)}: 1-min plank", "xp": 10, "type": "plank", "time_min": 1, "desc": "Fortify your core defenses!"},
+    {"task": f"Climb Spire #{random.randint(100, 999)}: 10 pull-ups", "xp": 15, "type": "pull_ups", "reps": 10, "desc": "Ascend to new heights!"},
+    {"task": f"Ride Storm #{random.randint(100, 999)}: 10 km cycle", "xp": 15, "type": "cycle_outdoor", "distance": 10, "desc": "Speed through chaos!"},
+    {"task": f"Strike Core #{random.randint(100, 999)}: 20 sit-ups", "xp": 10, "type": "sit_ups", "reps": 20, "desc": "Forge an iron midsection!"},
+    {"task": f"Mend Body #{random.randint(100, 999)}: 10 min stretch", "xp": 10, "type": "stretch", "time_one": 10, "desc": "Restore your vitality!"},
+    {"task": f"Unleash Fury #{random.randint(100, 999)}: 20 min HIIT", "xp": 20, "type": "hiit", "time_min": 20, "desc": "Obliterate all weakness!"}
 ]
 
 def reset_daily_quests():
@@ -228,19 +246,19 @@ skill_icons = {
 }
 
 skill_desc = {
-    "push_ups": "Master upper body strength!",
-    "pull_ups": "Conquer the bar with power!",
-    "sit_ups": "Forge an iron core!",
-    "squats": "Build legs of steel!",
-    "plank": "Fortify your core defenses!",
-    "run": "Outrun any challenge!",
-    "walk_outdoor": "Explore the world on foot!",
-    "walk_treadmill": "March to victory indoors!",
-    "cycle_outdoor": "Ride through any storm!",
-    "cycle_static": "Pedal to greatness!",
-    "stretch": "Stay limber and ready!",
-    "hiit": "Unleash explosive energy!",
-    "meal_log": "Fuel your body wisely!"
+    "push_ups": "Master upper body strength! +10% XP at Level 10.",
+    "pull_ups": "Conquer the bar with power! +10% XP at Level 10.",
+    "sit_ups": "Forge an iron core! +10% XP at Level 10.",
+    "squats": "Build legs of steel! +10% XP at Level 10.",
+    "plank": "Fortify your core defenses! +10% XP at Level 10.",
+    "run": "Outrun any challenge! +10% XP at Level 10.",
+    "walk_outdoor": "Explore the world on foot! +10% XP at Level 10.",
+    "walk_treadmill": "March to victory indoors! +10% XP at Level 10.",
+    "cycle_outdoor": "Ride through any storm! +10% XP at Level 10.",
+    "cycle_static": "Pedal to greatness! +10% XP at Level 10.",
+    "stretch": "Stay limber and ready! +10% XP at Level 10.",
+    "hiit": "Unleash explosive energy! +10% XP at Level 10.",
+    "meal_log": "Fuel your body wisely! +10% XP at Level 10."
 }
 
 # === ACHIEVEMENTS ===
@@ -248,7 +266,8 @@ achievements = {
     "weekly_warrior": {"name": "Weekly Warrior", "xp": 100, "desc": "Log 3+ workouts in a week"},
     "macro_master": {"name": "Macro Master", "xp": 50, "desc": "Achieve 80%+ balance score"},
     "quest_master": {"name": "Quest Master", "xp": 200, "desc": "Complete all quests 5 days in a row"},
-    "skill_pioneer": {"name": "Skill Pioneer", "xp": 150, "desc": "Reach Level 10 in any skill"}
+    "skill_pioneer": {"name": "Skill Pioneer", "xp": 150, "desc": "Reach Level 10 in any skill"},
+    "epic_questor": {"name": "Epic Questor", "xp": 300, "desc": "Maintain a 10-day quest streak"}
 }
 
 # === XP SYSTEM ===
@@ -262,6 +281,8 @@ def award_fitness_xp(workout_type, reps=0, distance=0, time_min=0, intensity="Me
         xp_gain += int(distance * 3)
     elif workout_type in ["walk_treadmill", "cycle_static"]:
         xp_gain += time_min // 5
+    if st.session_state.get("guild"):
+        xp_gain = int(xp_gain * 1.05)  # +5% XP for guild members
     st.session_state.xp += xp_gain
     st.session_state.total_xp += xp_gain
     st.session_state.xp_history.append({
@@ -282,17 +303,8 @@ def award_nutrition_xp(calories, protein, carbs, fats):
         fats_diff = abs(fats - st.session_state.macro_goal["fats"]) / st.session_state.macro_goal["fats"]
         balance_score = max(0, 100 - (protein_diff + carbs_diff + fats_diff) * 100 / 3)
         xp_gain += int(balance_score * 0.15)
-    df = pd.DataFrame(st.session_state.progress_nutrition)
-    if not df.empty:
-        df["date"] = pd.to_datetime(df["date"])
-        last_7_days = df[df["date"] >= datetime.now() - pd.Timedelta(days=7)]
-        daily_totals = last_7_days.groupby(last_7_days["date"].dt.date)["calories"].sum()
-        goal_hits = sum(1 for c in daily_totals if abs(c - st.session_state.calorie_goal) <= 0.1 * st.session_state.calorie_goal)
-        if goal_hits >= 3:
-            xp_gain += 20
-        today = df[df["date"].dt.date == datetime.now().date()]
-        if len(today) >= 3:
-            xp_gain += 10
+    if st.session_state.get("guild"):
+        xp_gain = int(xp_gain * 1.05)
     st.session_state.xp += xp_gain
     st.session_state.total_xp += xp_gain
     st.session_state.xp_history.append({
@@ -315,10 +327,14 @@ def check_level_up():
             <audio autoplay>
                 <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
             </audio>
+            <script>
+                if (navigator.vibrate) navigator.vibrate(200);
+            </script>
         """, unsafe_allow_html=True)
         ability = get_ability(st.session_state.level)
         if ability:
             st.info(f"New Ability Unlocked: {ability}")
+        get_gear(st.session_state.level)
         save_user_data()
 
 def award_skill_xp(skill_type, amount):
@@ -332,6 +348,8 @@ def award_skill_xp(skill_type, amount):
             raise ValueError("XP amount cannot be negative")
         current_xp = st.session_state.skill_levels[skill_type]["xp"]
         current_level = st.session_state.skill_levels[skill_type]["level"]
+        if current_level >= 10:
+            xp_gain = int(xp_gain * 1.1)  # +10% XP for Level 10+
         new_xp = current_xp + xp_gain
         required_skill_xp = 100 + 50 * (current_level - 1)
         while new_xp >= required_skill_xp and current_level < 60:
@@ -353,6 +371,9 @@ def award_skill_xp(skill_type, amount):
                 <audio autoplay>
                     <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
                 </audio>
+                <script>
+                    if (navigator.vibrate) navigator.vibrate(200);
+                </script>
             """, unsafe_allow_html=True)
             required_skill_xp = 100 + 50 * (current_level - 1)
         st.session_state.skill_levels[skill_type]["xp"] = new_xp
@@ -392,6 +413,18 @@ def check_achievements():
         """, unsafe_allow_html=True)
         save_user_data()
         check_level_up()
+    if st.session_state.get("quest_streak", 0) >= 10 and "epic_questor" not in st.session_state.achievements:
+        st.session_state.achievements.append("epic_questor")
+        st.session_state.xp += achievements["epic_questor"]["xp"]
+        st.session_state.total_xp += achievements["epic_questor"]["xp"]
+        st.success(f"Achievement Unlocked: {achievements['epic_questor']['name']}! +{achievements['epic_questor']['xp']} XP")
+        st.markdown("""
+            <audio autoplay>
+                <source src="https://orangefreesounds.com/wp-content/uploads/2016/09/Level-up-sound-effect.mp3" type="audio/mpeg">
+            </audio>
+        """, unsafe_allow_html=True)
+        save_user_data()
+        check_level_up()
 
 # === ONBOARDING ===
 if not st.session_state.get("onboarded", False):
@@ -404,37 +437,41 @@ if not st.session_state.get("onboarded", False):
         - 🏆 Complete missions to become a legend!  
         Set your stats in the sidebar to begin. Let’s conquer! 💪  
         """)
-        if st.button("Embark on Quest!"):
+        if st.button("Embark on Quest!", key="onboard"):
             st.session_state["onboarded"] = True
             save_user_data()
 
 # === SIDE BAR ===
 with st.sidebar:
-    st.subheader("⚙️ Hero Stats")
+    st.subheader("⚙️ Hero Stats", key="hero-stats")
     if not st.session_state.name:
-        name = st.text_input("Your Name", placeholder="Jake")
+        name = st.text_input("Your Name", placeholder="Jake", key="name-input")
         if name:
             st.session_state.name = name
             st.success(f"Welcome, {name}!")
             save_user_data()
     st.markdown(f"**Avatar**: {get_avatar_title(st.session_state.level)}")
-    st.session_state.user_gender = st.radio("Gender", ["Male", "Female"], horizontal=True)
-    st.session_state.user_age = st.number_input("Age", min_value=18, max_value=100, value=st.session_state.user_age)
-    st.session_state.height_cm = st.number_input("Height (cm)", min_value=100.0, max_value=250.0, value=st.session_state.height_cm, step=0.1)
-    unit = st.radio("Weight Unit", ["kg", "st/lb"], horizontal=True)
+    if st.session_state.gear:
+        st.markdown(f"**Gear**: {', '.join(st.session_state.gear)}")
+    else:
+        st.markdown("**Gear**: None")
+    st.session_state.user_gender = st.radio("Gender", ["Male", "Female"], horizontal=True, key="gender-radio")
+    st.session_state.user_age = st.number_input("Age", min_value=18, max_value=100, value=st.session_state.user_age, key="age-input")
+    st.session_state.height_cm = st.number_input("Height (cm)", min_value=100.0, max_value=250.0, value=st.session_state.height_cm, step=0.1, key="height-input")
+    unit = st.radio("Weight Unit", ["kg", "st/lb"], horizontal=True, key="unit-radio")
     st.session_state.weight_unit = unit
     if unit == "kg":
-        weight = st.number_input("Body Weight (kg)", min_value=30.0, max_value=200.0, value=st.session_state.body_weight_kg, step=0.1)
+        weight = st.number_input("Body Weight (kg)", min_value=30.0, max_value=200.0, value=st.session_state.body_weight_kg, step=0.1, key="weight-kg")
         st.session_state.body_weight_kg = weight
     else:
-        stones = st.number_input("Stones", min_value=4, max_value=30, value=11)
-        pounds = st.number_input("Pounds", min_value=0, max_value=13, value=0)
+        stones = st.number_input("Stones", min_value=4, max_value=30, value=11, key="stones-input")
+        pounds = st.number_input("Pounds", min_value=0, max_value=13, value=0, key="pounds-input")
         weight_kg = (stones * 6.35029) + (pounds * 0.453592)
         st.session_state.body_weight_kg = weight_kg
         st.info(f"≈ {weight_kg:.1f} kg")
-    goal = st.selectbox("Weight Goal", ["Lose Weight", "Maintain", "Gain Weight"])
+    goal = st.selectbox("Weight Goal", ["Lose Weight", "Maintain", "Gain Weight"], key="goal-select")
     st.session_state.weight_goal = goal
-    if st.button("Calculate Calories & Macros"):
+    if st.button("Calculate Calories & Macros", key="calc-button"):
         if st.session_state.user_gender == "Male":
             bmr = 88.362 + (13.397 * st.session_state.body_weight_kg) + (4.799 * st.session_state.height_cm) - (5.677 * st.session_state.user_age)
         else:
@@ -452,11 +489,18 @@ with st.sidebar:
         st.success(f"Done! BMR: {st.session_state.bmr} cal | Daily Calories: {int(calories)} cal")
         save_user_data()
     st.divider()
-    st.subheader("🏅 Achievements")
+    st.subheader("🛡️ Guild", key="guild-header")
+    guilds = ["", "Strength Warriors", "Endurance Runners", "Flexibility Mages"]
+    st.session_state.guild = st.selectbox("Join a Guild (+5% XP)", guilds, key="guild-select")
+    if st.session_state.guild:
+        st.info(f"Guild: {st.session_state.guild}")
+    save_user_data()
+    st.divider()
+    st.subheader("🏅 Achievements", key="achievements-header")
     for ach in st.session_state.achievements:
         st.markdown(f"**{achievements[ach]['name']}**: {achievements[ach]['desc']} (+{achievements[ach]['xp']} XP)")
     if not st.session_state.achievements:
-        st.info("No achievements yet. Complete quests and workouts to earn some! 🥇")
+        st.info("No achievements yet. Complete quests to earn some! 🥇")
 
 # === LLM INVOCATION ===
 def chain_invoke(chain, history, user_input):
@@ -484,11 +528,11 @@ def chain_invoke(chain, history, user_input):
 st.markdown("<h3 style='text-align: center; color: #f0f0f0;'>🏆 Cyberpunk HUD</h3>", unsafe_allow_html=True)
 col1, col2 = st.columns([1, 3])
 with col1:
-    st.metric("Level", f"{st.session_state.level} ({get_avatar_title(st.session_state.level)})")
+    st.metric("Level", f"{st.session_state.level} ({get_avatar_title(st.session_state.level)})", key="level-metric")
     required_xp = 100 + 50 * (st.session_state.level - 1)
-    st.metric("XP", f"{st.session_state.xp}/{required_xp}")
+    st.metric("XP", f"{st.session_state.xp}/{required_xp}", key="xp-metric")
     st.progress(min(st.session_state.xp / required_xp, 1.0))
-    st.metric("Total XP", st.session_state.total_xp)
+    st.metric("Total XP", st.session_state.total_xp, key="total-xp-metric")
     fitness_df = pd.DataFrame(st.session_state.progress_fitness)
     nutrition_df = pd.DataFrame(st.session_state.progress_nutrition)
     if not fitness_df.empty:
@@ -501,29 +545,36 @@ with col1:
     total_burned = st.session_state.bmr + total_burned_workouts
     total_consumed = today_nutrition["calories"].sum() if not today_nutrition.empty else 0
     net_calories = total_consumed - total_burned
-    health = max(0, min(1, (net_calories + 1000) / 2000))  # -1000 to +1000 maps to 0–100%
+    health = max(0, min(1, (net_calories + 1000) / 2000))  # -1000 to +1000 → 0–100%
+    health_color = "#b22222" if net_calories < 0 else "#4682b4"
+    st.markdown(f"<style>.health-bar .stProgress > div > div > div > div {{ background: linear-gradient(to right, {health_color}, {health_color}80); }}</style>", unsafe_allow_html=True)
     st.markdown("**Health**")
-    st.progress(health, bar_color="#b22222" if net_calories < 0 else "#4682b4")
+    st.markdown('<div class="health-bar">', unsafe_allow_html=True)
+    st.progress(health)
+    st.markdown('</div>', unsafe_allow_html=True)
     mana = min(1, st.session_state.bmr / 3000)  # BMR up to 3000
+    st.markdown("<style>.mana-bar .stProgress > div > div > div > div { background: linear-gradient(to right, #4682b4, #4682b480); }</style>", unsafe_allow_html=True)
     st.markdown("**Mana**")
-    st.progress(mana, bar_color="#4682b4")
+    st.markdown('<div class="mana-bar">', unsafe_allow_html=True)
+    st.progress(mana)
+    st.markdown('</div>', unsafe_allow_html=True)
 with col2:
     st.markdown(f"**Mission Log**: Streak: {st.session_state.get('quest_streak', 0)} Days 🔥", unsafe_allow_html=True)
 
 # === MAIN CONTENT ===
 st.markdown("<h1 style='text-align: center; color: #f0f0f0;'>Coach Woody's Fitness RPG</h1>", unsafe_allow_html=True)
 
-# Cyberpunk CSS with readable greys
+# Cyberpunk CSS with accessibility
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
     body {
         font-family: 'Press Start 2P', cursive;
-        background: linear-gradient(to bottom, #2a2a2a, #3c3c3c);
+        background: linear-gradient(to bottom, #2a2a2a, #4a4a4a);
         background-image: url('https://www.transparenttextures.com/patterns/dark-mosaic.png');
         background-size: cover;
         color: #f0f0f0;
-        font-size: 12px;
+        font-size: 14px;
     }
     .stExpander {
         border: 2px solid #ffffff;
@@ -535,33 +586,37 @@ st.markdown("""
         background-color: #4a4a4a;
         color: #f0f0f0;
         border: 2px solid #ffffff;
-        padding: 10px 20px;
+        padding: 12px 24px;
         font-family: 'Press Start 2P', cursive;
         border-radius: 5px;
         transition: all 0.3s ease;
     }
-    .stButton > button:hover {
+    .stButton > button:hover, .stButton > button:focus {
         background-color: #5a5a5a;
         border-color: #5f9ea0;
         color: #5f9ea0;
         box-shadow: 0 0 10px #5f9ea0;
     }
+    .stButton > button:active {
+        transform: scale(0.95);
+    }
     .alert-badge {
         background-color: #b22222;
         color: #f0f0f0;
-        padding: 5px 10px;
+        padding: 6px 12px;
         border-radius: 12px;
-        font-size: 12px;
+        font-size: 14px;
         margin-left: 10px;
         vertical-align: middle;
     }
     .stProgress > div > div > div > div {
-        background-color: #4682b4;
+        background: linear-gradient(to right, #4682b4, #4682b480);
+        transition: background 0.3s ease;
     }
     .stMetric {
         background-color: #505050;
         border-radius: 5px;
-        padding: 12px;
+        padding: 14px;
         border: 1px solid #ffffff;
     }
     .stTextInput > div > div > input, .stSelectbox > div > div > select, .stNumberInput > div > div > input {
@@ -578,28 +633,39 @@ st.markdown("""
     .tooltip {
         position: relative;
         display: inline-block;
+        cursor: pointer;
     }
     .tooltip .tooltiptext {
         visibility: hidden;
-        width: 120px;
+        width: 140px;
         background-color: #505050;
         color: #f0f0f0;
         text-align: center;
         border-radius: 6px;
-        padding: 5px;
+        padding: 6px;
         position: absolute;
         z-index: 1;
         bottom: 125%;
         left: 50%;
-        margin-left: -60px;
+        margin-left: -70px;
         opacity: 0;
         transition: opacity 0.3s;
     }
-    .tooltip:hover .tooltiptext {
+    .tooltip:hover .tooltiptext, .tooltip:focus .tooltiptext {
         visibility: visible;
         opacity: 1;
     }
+    [tabindex="0"]:focus {
+        outline: 2px solid #5f9ea0;
+    }
     </style>
+    <script>
+        document.querySelectorAll('.stButton > button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                new Audio('https://freesound.org/data/previews/269/269025_5094888-lq.mp3').play();
+            });
+        });
+    </script>
 """, unsafe_allow_html=True)
 
 # === DAILY QUESTS EXPANDER ===
@@ -609,7 +675,7 @@ quest_label = f"📜 Quest Board <span class='alert-badge'>{uncompleted_quests}<
 st.markdown(f"<h2 style='color: #f0f0f0;'>{quest_label}</h2>", unsafe_allow_html=True)
 with st.expander("Mission Briefing", expanded=uncompleted_quests > 0):
     st.info("Complete 5 daily missions to earn XP and glory! Resets at midnight. 🌌")
-    st.metric("Missions Completed", f"{quest_progress}/5")
+    st.metric("Missions Completed", f"{quest_progress}/5", key="quest-metric")
     for i, quest in st.session_state.daily_quests.items():
         st.markdown(f"**{quest['task']}** (+{quest['xp']} XP) - {quest['desc']}")
         completed = st.checkbox("Mark as Completed", value=quest["completed"], key=f"quest_{i}")
@@ -669,8 +735,8 @@ with st.expander("🏋️ Training Grounds"):
         "Push-ups", "Pull-ups", "Sit-ups", "Squats", "Plank", "Run",
         "Walk (Outdoor)", "Walk (Treadmill)", "Cycle (Outdoor)", "Cycle (Static Bike)",
         "Stretch", "HIIT"
-    ])
-    intensity = st.selectbox("Intensity", ["Low", "Medium", "High"])
+    ], key="workout-select")
+    intensity = st.selectbox("Intensity", ["Low", "Medium", "High"], key="intensity-select")
     if workout in ["Push-ups", "Pull-ups", "Sit-ups", "Squats"]:
         variations = {
             "Push-ups": ["Normal", "Close-Grip", "Wide-Grip"],
@@ -678,10 +744,10 @@ with st.expander("🏋️ Training Grounds"):
             "Sit-ups": ["Standard", "Russian Twists", "Leg Raises"],
             "Squats": ["Bodyweight", "Goblet", "Sumo"]
         }
-        variation = st.selectbox("Variation", variations[workout])
-        reps = st.number_input("Reps", min_value=0, value=0)
-        time_min = st.number_input("Time (min)", min_value=0.0, value=5.0, step=0.1)
-        if st.button("Log Training"):
+        variation = st.selectbox("Variation", variations[workout], key="variation-select")
+        reps = st.number_input("Reps", min_value=0, value=0, key="reps-input")
+        time_min = st.number_input("Time (min)", min_value=0.0, value=5.0, step=0.1, key="time-input")
+        if st.button("Log Training", key="log-workout"):
             type_lower = workout.lower().replace(" ", "_")
             entry = {
                 "date": datetime.now().strftime("%Y-%m-%d"),
@@ -704,8 +770,8 @@ with st.expander("🏋️ Training Grounds"):
             save_user_data()
             check_achievements()
     elif workout == "Plank":
-        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
-        if st.button("Log Plank"):
+        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1, key="plank-time")
+        if st.button("Log Plank", key="log-plank"):
             if time_min > 0:
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d"),
@@ -723,9 +789,9 @@ with st.expander("🏋️ Training Grounds"):
                 st.success(f"Trained {time_min} min plank ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Plank Skill XP")
                 check_achievements()
     elif workout == "Run":
-        distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
-        time_min = st.number_input("Time (min)", min_value=0)
-        if st.button("Log Run"):
+        distance = st.number_input("Distance (km)", min_value=0.0, step=0.1, key="run-distance")
+        time_min = st.number_input("Time (min)", min_value=0, key="run-time")
+        if st.button("Log Run", key="log-run"):
             if distance > 0 and time_min > 0:
                 pace = round(time_min / distance, 2)
                 entry = {
@@ -746,10 +812,10 @@ with st.expander("🏋️ Training Grounds"):
                 st.success(f"Trained {distance}km run ({intensity})! Pace: {pace} min/km | Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Run Skill XP")
                 check_achievements()
     elif workout == "Walk (Outdoor)":
-        distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
-        time_min = st.number_input("Time (min)", min_value=0)
-        terrain = st.selectbox("Terrain", ["Flat", "Hilly", "Mixed"])
-        if st.button("Log Walk"):
+        distance = st.number_input("Distance (km)", min_value=0.0, step=0.1, key="walk-distance")
+        time_min = st.number_input("Time (min)", min_value=0, key="walk-time")
+        terrain = st.selectbox("Terrain", ["Flat", "Hilly", "Mixed"], key="terrain-select")
+        if st.button("Log Walk", key="log-walk"):
             if distance > 0:
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d"),
@@ -769,10 +835,10 @@ with st.expander("🏋️ Training Grounds"):
                 st.success(f"Trained {distance}km walk ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Walk Outdoor Skill XP")
                 check_achievements()
     elif workout == "Walk (Treadmill)":
-        speed = st.number_input("Speed (km/h)", min_value=0.0, step=0.1)
-        incline = st.number_input("Incline (%)", min_value=0.0, step=0.5)
-        time_min = st.number_input("Time (min)", min_value=0)
-        if st.button("Log Treadmill"):
+        speed = st.number_input("Speed (km/h)", min_value=0.0, step=0.1, key="treadmill-speed")
+        incline = st.number_input("Incline (%)", min_value=0.0, step=0.5, key="treadmill-incline")
+        time_min = st.number_input("Time (min)", min_value=0, key="treadmill-time")
+        if st.button("Log Treadmill", key="log-treadmill"):
             if time_min > 0:
                 distance = round(speed * (time_min / 60), 2)
                 entry = {
@@ -794,9 +860,9 @@ with st.expander("🏋️ Training Grounds"):
                 st.success(f"Trained {distance}km treadmill ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Walk Treadmill Skill XP")
                 check_achievements()
     elif workout == "Cycle (Outdoor)":
-        distance = st.number_input("Distance (km)", min_value=0.0, step=0.1)
-        time_min = st.number_input("Time (min)", min_value=0)
-        if st.button("Log Cycle"):
+        distance = st.number_input("Distance (km)", min_value=0.0, step=0.1, key="cycle-distance")
+        time_min = st.number_input("Time (min)", min_value=0, key="cycle-time")
+        if st.button("Log Cycle", key="log-cycle"):
             if distance > 0 and time_min > 0:
                 speed = round(distance / (time_min / 60), 1)
                 entry = {
@@ -817,10 +883,10 @@ with st.expander("🏋️ Training Grounds"):
                 st.success(f"Trained {distance}km cycle ({intensity})! Speed: {speed} km/h | Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Cycle Outdoor Skill XP")
                 check_achievements()
     elif workout == "Cycle (Static Bike)":
-        time_min = st.number_input("Time (min)", min_value=0)
-        resistance = st.slider("Resistance", 1, 20, 10)
-        rpm = st.number_input("Avg RPM", min_value=0, value=70)
-        if st.button("Log Static Bike"):
+        time_min = st.number_input("Time (min)", min_value=0, key="static-time")
+        resistance = st.slider("Resistance", 1, 20, 10, key="resistance-slider")
+        rpm = st.number_input("Avg RPM", min_value=0, value=70, key="rpm-input")
+        if st.button("Log Static Bike", key="log-static"):
             if time_min > 0:
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d"),
@@ -840,8 +906,8 @@ with st.expander("🏋️ Training Grounds"):
                 st.success(f"Trained {time_min} min static bike ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Cycle Static Skill XP")
                 check_achievements()
     elif workout == "Stretch":
-        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
-        if st.button("Log Stretch"):
+        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1, key="stretch-time")
+        if st.button("Log Stretch", key="log-stretch"):
             if time_min > 0:
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d"),
@@ -859,8 +925,8 @@ with st.expander("🏋️ Training Grounds"):
                 st.success(f"Trained {time_min} min stretch ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Stretch Skill XP")
                 check_achievements()
     elif workout == "HIIT":
-        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1)
-        if st.button("Log HIIT"):
+        time_min = st.number_input("Time (min)", min_value=0.0, step=0.1, key="hiit-time")
+        if st.button("Log HIIT", key="log-hiit"):
             if time_min > 0:
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d"),
@@ -880,12 +946,12 @@ with st.expander("🏋️ Training Grounds"):
 
     # Log Nutrition
     st.subheader("Refuel Your Body")
-    meal = st.selectbox("Meal Type", ["Breakfast", "Lunch", "Dinner", "Snack"])
-    calories = st.number_input("Calories", min_value=0, value=0)
-    protein = st.number_input("Protein (g)", min_value=0, value=0)
-    carbs = st.number_input("Carbs (g)", min_value=0, value=0)
-    fats = st.number_input("Fats (g)", min_value=0, value=0)
-    if st.button("Log Meal"):
+    meal = st.selectbox("Meal Type", ["Breakfast", "Lunch", "Dinner", "Snack"], key="meal-select")
+    calories = st.number_input("Calories", min_value=0, value=0, key="calories-input")
+    protein = st.number_input("Protein (g)", min_value=0, value=0, key="protein-input")
+    carbs = st.number_input("Carbs (g)", min_value=0, value=0, key="carbs-input")
+    fats = st.number_input("Fats (g)", min_value=0, value=0, key="fats-input")
+    if st.button("Log Meal", key="log-meal"):
         entry = {
             "date": datetime.now().strftime("%Y-%m-%d"),
             "type": meal.lower(),
@@ -915,9 +981,9 @@ with st.expander("🏋️ Training Grounds"):
     if st.session_state.progress_fitness or st.session_state.progress_nutrition:
         st.subheader("Energy Matrix")
         col1, col2, col3 = st.columns(3)
-        col1.metric("Consumed Today", int(total_consumed))
-        col2.metric("Burned Today", int(total_burned))
-        col3.metric("Net Calories", int(net_calories))
+        col1.metric("Consumed Today", int(total_consumed), key="consumed-metric")
+        col2.metric("Burned Today", int(total_burned), key="burned-metric")
+        col3.metric("Net Calories", int(net_calories), key="net-metric")
 
 # === SKILL TREE EXPANDER ===
 with st.expander("🌳 Skill Matrix"):
@@ -929,7 +995,7 @@ with st.expander("🌳 Skill Matrix"):
         required_xp = 100 + 50 * (level - 1)
         badge = " 🏆 Master" if level >= 10 else ""
         st.markdown(f"""
-            <div class='tooltip'>
+            <div class='tooltip' tabindex='0'>
                 **{skill_icons.get(key, '⭐')} {skill_name}: Level {level}{badge}** ({xp}/{required_xp} XP)
                 <span class='tooltiptext'>{skill_desc.get(key, 'Hone this skill!')}</span>
             </div>
@@ -965,7 +1031,7 @@ with st.expander("🤝 Command Center"):
     {coach_name}:
     """)
     chain = prompt | llm | StrOutputParser() if llm else None
-    user_prompt = st.chat_input("Query the commander...")
+    user_prompt = st.chat_input("Query the commander...", key="chat-input")
     if st.session_state.quick_prompt:
         user_prompt = st.session_state.quick_prompt
         st.session_state.quick_prompt = None
@@ -991,8 +1057,8 @@ with st.expander("🤝 Command Center"):
 
     st.subheader("Form Analysis")
     st.info("Upload your form data for review! 🧠")
-    form_prompt = st.text_area("Form Data", placeholder="E.g., My push-up form feels off...")
-    if st.button("Analyze Form"):
+    form_prompt = st.text_area("Form Data", placeholder="E.g., My push-up form feels off...", key="form-input")
+    if st.button("Analyze Form", key="form-button"):
         if form_prompt:
             prompt = ChatPromptTemplate.from_template(f"""
             You are {coach_name}, {'motivational strength coach' if gender == 'Male (Woody)' else 'graceful, empowering trainer'}.

@@ -374,7 +374,7 @@ def chain_invoke(chain, history, user_input):
         return "Sorry, I couldn't generate a response. Please try again."
 
 # === TOP BAR (HUD) ===
-st.markdown("<h3 style='text-align: center; color: #ffd700;'>🏆 Status HUD</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #f0f0f0;'>🏆 Status HUD</h3>", unsafe_allow_html=True)
 col1, col2 = st.columns([1, 3])
 with col1:
     st.metric("Level", st.session_state.level, delta=None, delta_color="normal", help="Your overall player level")
@@ -386,38 +386,38 @@ with col2:
     st.markdown("**Mission Log**: Track your progress and conquer challenges!", unsafe_allow_html=True)
 
 # === MAIN CONTENT ===
-st.markdown("<h1 style='text-align: center; color: #00ff00;'>Coach Woody's Fitness RPG</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #f0f0f0;'>Coach Woody's Fitness RPG</h1>", unsafe_allow_html=True)
 
-# Gaming CSS for pixelated, immersive UI
+# Gaming CSS with toned-down, readable colors
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
     body { 
         font-family: 'Press Start 2P', cursive; 
-        background-color: #0f0f23; 
-        color: #ffffff; 
+        background-color: #2a2a2a; 
+        color: #f0f0f0; 
     }
     .stExpander { 
-        border: 2px solid #ffd700; 
-        background-color: #1a1a3a; 
+        border: 2px solid #ffffff; 
+        background-color: #3c3c3c; 
         margin-bottom: 15px; 
         border-radius: 8px; 
     }
     .stButton > button { 
-        background-color: #4b0082; 
-        color: #ffd700; 
-        border: 2px solid #ffd700; 
+        background-color: #4a4a4a; 
+        color: #f0f0f0; 
+        border: 2px solid #ffffff; 
         padding: 8px 16px; 
         font-family: 'Press Start 2P', cursive; 
         border-radius: 5px; 
     }
     .stButton > button:hover { 
-        background-color: #6a0dad; 
-        color: #ffffff; 
+        background-color: #5a5a5a; 
+        color: #f0f0f0; 
     }
     .alert-badge { 
-        background-color: #ff4500; 
-        color: white; 
+        background-color: #b22222; 
+        color: #f0f0f0; 
         padding: 4px 8px; 
         border-radius: 12px; 
         font-size: 10px; 
@@ -425,21 +425,21 @@ st.markdown("""
         vertical-align: middle; 
     }
     .stProgress > div > div > div > div { 
-        background-color: #00ff00; 
+        background-color: #4682b4; 
     }
     .stMetric { 
-        background-color: #2a2a5a; 
+        background-color: #505050; 
         border-radius: 5px; 
         padding: 10px; 
     }
     .stTextInput > div > div > input, .stSelectbox > div > div > select, .stNumberInput > div > div > input {
-        background-color: #2a2a5a; 
-        color: #ffffff; 
-        border: 1px solid #ffd700; 
+        background-color: #404040; 
+        color: #f0f0f0; 
+        border: 1px solid #ffffff; 
         font-family: 'Press Start 2P', cursive; 
     }
     .stSidebar { 
-        background-color: #1a1a3a; 
+        background-color: #3c3c3c; 
     }
     </style>
 """, unsafe_allow_html=True)
@@ -448,7 +448,7 @@ st.markdown("""
 quest_progress = sum(1 for q in st.session_state.daily_quests.values() if q["completed"])
 uncompleted_quests = 5 - quest_progress
 quest_label = f"🏆 Daily Quests <span class='alert-badge'>{uncompleted_quests}</span>" if uncompleted_quests > 0 else "🏆 Daily Quests (All Completed!)"
-st.markdown(f"<h2 style='color: #ffd700;'>{quest_label}</h2>", unsafe_allow_html=True)
+st.markdown(f"<h2 style='color: #f0f0f0;'>{quest_label}</h2>", unsafe_allow_html=True)
 with st.expander("", expanded=uncompleted_quests > 0):
     st.info("Complete 5 daily quests to earn XP and unlock a bonus! Resets at midnight. 🌟")
     st.metric("Quests Completed", f"{quest_progress}/5")
@@ -712,6 +712,62 @@ with st.expander("🏋️ Track Fitness & Nutrition"):
     # Log Nutrition
     st.subheader("Log Nutrition")
     meal = st.selectbox("Meal Type", ["Breakfast", "Lunch", "Dinner", "Snack"])
+    calories = st.number_input("Calories", min_value=0, value=0)
+    protein = st.number_input("Protein (g)", min_value=0, value=0)
+    carbs = st.number_input("Carbs (g)", min_value=0, value=0)
+    fats = st.number_input("Fats (g)", min_value=0, value=0)
+    if st.button("Log Meal"):
+        entry = {
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "type": meal.lower(),
+            "calories": calories,
+            "protein": protein,
+            "carbs": carbs,
+            "fats": fats
+        }
+        st.session_state.progress_nutrition.append(entry)
+        xp_gain, balance_score = award_nutrition_xp(calories, protein, carbs, fats)
+        award_skill_xp("meal_log", 1)
+        save_user_data()
+        st.success(f"Logged {meal}: {calories} cal (Balance: {balance_score:.0f}%)! +{xp_gain} XP | +1 Meal Log Skill XP")
+
+    # Calorie Summary
+    if st.session_state.progress_fitness or st.session_state.progress_nutrition:
+        fitness_df = pd.DataFrame(st.session_state.progress_fitness)
+        nutrition_df = pd.DataFrame(st.session_state.progress_nutrition)
+        if not fitness_df.empty:
+            fitness_df["date"] = pd.to_datetime(fitness_df["date"])
+        if not nutrition_df.empty:
+            nutrition_df["date"] = pd.to_datetime(nutrition_df["date"])
+        today_fitness = fitness_df[fitness_df["date"].dt.date == datetime.now().date()] if not fitness_df.empty else pd.DataFrame()
+        today_nutrition = nutrition_df[nutrition_df["date"].dt.date == datetime.now().date()] if not nutrition_df.empty else pd.DataFrame()
+        total_burned_workouts = today_fitness["calories_burned"].sum() if "calories_burned" in today_fitness.columns else 0
+        total_burned = st.session_state.bmr + total_burned_workouts
+        total_consumed = today_nutrition["calories"].sum() if not today_nutrition.empty else 0
+        net_calories = total_consumed - total_burned
+        st.subheader("Calorie Summary")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Consumed Today", int(total_consumed))
+        col2.metric("Burned Today", int(total_burned))
+        col3.metric("Net Calories", int(net_calories))
+
+# === PROGRESS EXPANDER ===
+with st.expander("📊 Skill Tree"):
+    st.subheader("Skills")
+    for key, value in st.session_state.skill_levels.items():
+        skill_name = key.replace("_", " ").title()
+        level = value["level"]
+        xp = value["xp"]
+        required_xp = 100 + 50 * (level - 1)
+        st.markdown(f"**{skill_name}: Level {level}** ({xp}/{required_xp} XP)")
+        st.progress(min(xp / required_xp, 1.0))
+
+# === COACH WOODY EXPANDER ===
+with st.expander("🤝 Coach Woody"):
+    # Quick Start
+    st.subheader("Quick Start")
+    st.write("Ask about fitness or nutrition! 🌟")
+    col’clock": ["Breakfast", "Lunch", "Dinner", "Snack"])
     calories = st.number_input("Calories", min_value=0, value=0)
     protein = st.number_input("Protein (g)", min_value=0, value=0)
     carbs = st.number_input("Carbs (g)", min_value=0, value=0)

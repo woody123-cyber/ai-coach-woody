@@ -15,10 +15,6 @@ st.set_page_config(page_title="Coach Woody", page_icon="trophy", layout="wide")
 # === SECRETS ===
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
-# === GENDER TOGGLE ===
-gender = st.sidebar.radio("Coach Gender", ["Male (Woody)", "Female (Hibiki)"], horizontal=True)
-coach_name = "Woody" if gender == "Male (Woody)" else "Hibiki"
-
 # === LLM ===
 try:
     llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=GROQ_API_KEY, temperature=0.7)
@@ -134,17 +130,6 @@ if "initialized" not in st.session_state:
             "meal_log": {"level": 1, "xp": 0}
         }
     }
-    # Validate skill_levels from user_data
-    if "skill_levels" in user_data:
-        for skill, data in user_data["skill_levels"].items():
-            if not isinstance(data, dict) or "level" not in data or "xp" not in data:
-                user_data["skill_levels"][skill] = {"level": 1, "xp": 0}
-                with open("error_log.txt", "a") as f:
-                    f.write(f"{datetime.now()}: Reset invalid skill {skill} in user_data.json\n")
-            elif not (1 <= data["level"] <= 60 and data["xp"] >= 0):
-                user_data["skill_levels"][skill] = {"level": 1, "xp": 0}
-                with open("error_log.txt", "a") as f:
-                    f.write(f"{datetime.now()}: Reset out-of-range skill {skill} in user_data.json\n")
     for key, value in defaults.items():
         try:
             st.session_state[key] = user_data.get(key, value)
@@ -172,6 +157,7 @@ quest_pool = [
 def reset_daily_quests():
     today = date.today().strftime("%Y-%m-%d")
     if st.session_state.get("last_quest_date") != today:
+        # Reset quests without affecting XP
         selected_quests = random.sample(quest_pool, 5)
         st.session_state.daily_quests = {
             i: {"task": q["task"], "xp": q["xp"], "completed": False, "type": q["type"],
@@ -182,6 +168,7 @@ def reset_daily_quests():
         st.session_state.all_quests_bonus = False
         save_user_data()
 
+# Only call reset_daily_quests once per session
 if "quests_reset" not in st.session_state:
     reset_daily_quests()
     st.session_state.quests_reset = True
@@ -272,7 +259,6 @@ def check_level_up():
         st.success(f"**LEVEL UP! → Level {st.session_state.level}**")
         save_user_data()
 
-# New: Skill XP Award Function
 def award_skill_xp(skill_type, amount):
     if skill_type not in st.session_state.skill_levels:
         st.session_state.skill_levels[skill_type] = {"level": 1, "xp": 0}
@@ -307,8 +293,8 @@ if not st.session_state.get("onboarded", False):
         st.markdown(f"""
         **Hi, {st.session_state.name or 'Athlete'}!** 👋  
         Coach Woody helps you with fitness and nutrition in one place!  
-        - 🏋️ Log workouts and level up skills (e.g., Push Ups, Running)  
-        - 🥗 Log meals and track Nutrition skill  
+        - 🏋️ Log workouts and track calories burned  
+        - 🥗 Log meals and monitor macros  
         - 🏆 Complete daily quests for XP  
         Start by setting your details in the sidebar. Let's get moving!  
         """)
@@ -325,57 +311,7 @@ with col1:
     st.progress(min(st.session_state.xp / required_xp, 1.0))
     st.metric("Total XP", st.session_state.total_xp)
 with col2:
-    st.subheader("Daily Quests")
-    st.info("Complete 5 fitness quests daily for XP! Resets at midnight.")
-    quest_progress = sum(1 for q in st.session_state.daily_quests.values() if q["completed"])
-    st.metric("Quests Completed", f"{quest_progress}/5")
-    for i, quest in st.session_state.daily_quests.items():
-        completed = st.checkbox(f"{quest['task']} (+{quest['xp']} XP)", value=quest["completed"], key=f"quest_{i}")
-        if completed and not quest["completed"]:
-            quest["completed"] = True
-            st.session_state.xp += quest["xp"]
-            st.session_state.total_xp += quest["xp"]
-            st.session_state.xp_history.append({
-                "date": datetime.now().strftime("%Y-%m-%d"),
-                "source": f"Quest: {quest['task']}",
-                "xp": quest["xp"]
-            })
-            entry = {
-                "date": datetime.now().strftime("%Y-%m-%d"),
-                "type": quest["type"],
-                "intensity": "Medium",
-                "calories_burned": 0
-            }
-            if quest["reps"] > 0:
-                entry["reps"] = quest["reps"]
-                entry["variation"] = "Standard"
-                award_skill_xp(quest["type"], quest["reps"])  # 1 XP per rep
-            if quest["distance"] > 0:
-                entry["distance"] = quest["distance"]
-                entry["time"] = 0
-                award_skill_xp(quest["type"], quest["distance"])  # 1 XP per km
-            if quest["time_min"] > 0:
-                entry["time"] = quest["time_min"]
-                met = met_values.get(quest["type"], {"Medium": 4.0}).get("Medium", 4.0)
-                entry["calories_burned"] = int(met * st.session_state.body_weight_kg * (quest["time_min"] / 60))
-                award_skill_xp(quest["type"], quest["time_min"])  # 1 XP per min
-            st.session_state.progress_fitness.append(entry)
-            save_user_data()
-            st.success(f"Quest '{quest['task']}' completed! +{quest['xp']} XP | +{quest.get('reps', 0) or quest.get('distance', 0) or quest.get('time_min', 0)} {quest['type'].replace('_', ' ').title()} Skill XP")
-            check_level_up()
-    if quest_progress == 5 and not st.session_state.get("all_quests_bonus", False):
-        st.session_state.xp += 50
-        st.session_state.total_xp += 50
-        st.session_state.xp_history.append({
-            "date": datetime.now().strftime("%Y-%m-%d"),
-            "source": "All Quests Bonus",
-            "xp": 50
-        })
-        st.session_state.all_quests_bonus = True
-        save_user_data()
-        st.balloons()
-        st.success("All quests completed! +50 XP Bonus!")
-        check_level_up()
+    
 
 # === SIDE BAR ===
 with st.sidebar:
@@ -408,7 +344,7 @@ with st.sidebar:
         else:
             bmr = 447.593 + (9.247 * st.session_state.body_weight_kg) + (3.098 * st.session_state.height_cm) - (4.330 * st.session_state.user_age)
         st.session_state.bmr = int(bmr)
-        maintenance = bmr * 1.55
+        maintenance = bmr * 1.55  # Moderate activity
         calories = maintenance + (200 if goal == "Gain Weight" else -200 if goal == "Lose Weight" else 0)
         protein = round(st.session_state.body_weight_kg * 2.20462 * 1.25)
         protein_cals = protein * 4
@@ -486,7 +422,7 @@ if workout in ["Push-ups", "Pull-ups", "Sit-ups", "Squats"]:
         st.session_state.progress_fitness.append(entry)
         xp_gain = award_fitness_xp(type_lower, reps=reps, intensity=intensity)
         if reps > 0:
-            award_skill_xp(type_lower, reps)  # 1 XP per rep
+            award_skill_xp(type_lower, reps)
             st.success(f"Logged {reps} {variation} {workout.lower()} ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{reps} {workout} Skill XP")
         else:
             st.warning("Please enter at least 1 rep to earn skill XP.")
@@ -506,7 +442,7 @@ elif workout == "Plank":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("plank", time_min=time_min, intensity=intensity)
-            award_skill_xp("plank", int(time_min))  # 1 XP per min
+            award_skill_xp("plank", int(time_min))
             save_user_data()
             st.success(f"Logged {time_min} min plank ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Plank Skill XP")
 elif workout == "Run":
@@ -528,7 +464,7 @@ elif workout == "Run":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("run", distance=distance, intensity=intensity)
-            award_skill_xp("run", int(distance))  # 1 XP per km
+            award_skill_xp("run", int(distance))
             save_user_data()
             st.success(f"Logged {distance}km run ({intensity})! Pace: {pace} min/km | Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Run Skill XP")
 elif workout == "Walk (Outdoor)":
@@ -550,7 +486,7 @@ elif workout == "Walk (Outdoor)":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("walk_outdoor", distance=distance, intensity=intensity)
-            award_skill_xp("walk_outdoor", int(distance))  # 1 XP per km
+            award_skill_xp("walk_outdoor", int(distance))
             save_user_data()
             st.success(f"Logged {distance}km walk ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Walk Outdoor Skill XP")
 elif workout == "Walk (Treadmill)":
@@ -574,7 +510,7 @@ elif workout == "Walk (Treadmill)":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("walk_treadmill", time_min=time_min, intensity=intensity)
-            award_skill_xp("walk_treadmill", int(time_min))  # 1 XP per min
+            award_skill_xp("walk_treadmill", int(time_min))
             save_user_data()
             st.success(f"Logged {distance}km treadmill ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Walk Treadmill Skill XP")
 elif workout == "Cycle (Outdoor)":
@@ -596,7 +532,7 @@ elif workout == "Cycle (Outdoor)":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("cycle_outdoor", distance=distance, intensity=intensity)
-            award_skill_xp("cycle_outdoor", int(distance))  # 1 XP per km
+            award_skill_xp("cycle_outdoor", int(distance))
             save_user_data()
             st.success(f"Logged {distance}km cycle ({intensity})! Speed: {speed} km/h | Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(distance)} Cycle Outdoor Skill XP")
 elif workout == "Cycle (Static Bike)":
@@ -618,7 +554,7 @@ elif workout == "Cycle (Static Bike)":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("cycle_static", time_min=time_min, intensity=intensity)
-            award_skill_xp("cycle_static", int(time_min))  # 1 XP per min
+            award_skill_xp("cycle_static", int(time_min))
             save_user_data()
             st.success(f"Logged {time_min} min static bike ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Cycle Static Skill XP")
 elif workout == "Stretch":
@@ -636,7 +572,7 @@ elif workout == "Stretch":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("stretch", time_min=time_min, intensity=intensity)
-            award_skill_xp("stretch", int(time_min))  # 1 XP per min
+            award_skill_xp("stretch", int(time_min))
             save_user_data()
             st.success(f"Logged {time_min} min stretch ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} Stretch Skill XP")
 elif workout == "HIIT":
@@ -654,7 +590,7 @@ elif workout == "HIIT":
             entry["calories_burned"] = int(calories_burned)
             st.session_state.progress_fitness.append(entry)
             xp_gain = award_fitness_xp("hiit", time_min=time_min, intensity=intensity)
-            award_skill_xp("hiit", int(time_min))  # 1 XP per min
+            award_skill_xp("hiit", int(time_min))
             save_user_data()
             st.success(f"Logged {time_min} min HIIT ({intensity})! Burned: {entry['calories_burned']} cal | +{xp_gain} XP | +{int(time_min)} HIIT Skill XP")
 
@@ -676,7 +612,7 @@ if st.button("Log Meal"):
     }
     st.session_state.progress_nutrition.append(entry)
     xp_gain, balance_score = award_nutrition_xp(calories, protein, carbs, fats)
-    award_skill_xp("meal_log", 1)  # 1 XP per meal logged
+    award_skill_xp("meal_log", 1)  # 1 XP per meal
     save_user_data()
     st.success(f"Logged {meal}: {calories} cal (Balance: {balance_score:.0f}%)! +{xp_gain} XP | +1 Meal Log Skill XP")
 
@@ -708,6 +644,16 @@ skill_df = pd.DataFrame([
     for key, value in st.session_state.skill_levels.items()
 ])
 st.table(skill_df)
+
+if st.session_state.xp_history:
+    xp_df = pd.DataFrame(st.session_state.xp_history)
+    xp_df["date"] = pd.to_datetime(xp_df["date"])
+    xp_df = xp_df[xp_df["date"] >= datetime.now() - pd.Timedelta(days=30)]
+    fig = px.bar(xp_df, x="date", y="xp", color="source", title="XP Gains Over Time")
+    fig.update_layout(font=dict(size=14))
+    st.plotly_chart(fig, use_container_width=True)
+    with st.expander("XP History"):
+        st.dataframe(xp_df[["date", "source", "xp"]], use_container_width=True)
 
 # === FORM CHECK ===
 st.subheader("Form Check")

@@ -6,5 +6,5 @@ groq
 opencv-python-headless
 pillow
 numpy
-plotly
+plotly>=5.0
 pandas

@@ -6,6 +6,7 @@ from langchain_core.output_parsers import StrOutputParser
 import cv2
 import numpy as np
 from PIL import Image
+import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 from datetime import datetime, timedelta
@@ -185,22 +186,63 @@ if uploaded:
     st.success(feedback)
     st.session_state.messages.append({"role": "assistant", "content": feedback})
 
-# === CHARTS ===
+# === CHARTS (SMOOTH & INTERACTIVE) ===
 if st.session_state.progress:
     df = pd.DataFrame(st.session_state.progress)
-    col1, col2 = st.columns(2)
+    df["date"] = pd.to_datetime(df["date"])
 
-    with col1:
-        strength = df[df["type"].str.contains("push|pull|sit")]
-        if not strength.empty:
-            fig = px.line(strength, x="date", y="reps", color="variation", facet_col="type", title="Strength Progress")
-            st.plotly_chart(fig, use_container_width=True)
+    # Date filter
+    st.subheader("Progress Dashboard")
+    date_filter = st.selectbox("View", ["Last 7 Days", "Last 30 Days", "All Time"])
+    if date_filter == "Last 7 Days":
+        cutoff = datetime.now() - timedelta(days=7)
+    elif date_filter == "Last 30 Days":
+        cutoff = datetime.now() - timedelta(days=30)
+    else:
+        cutoff = datetime.min
+    df = df[df["date"] >= cutoff]
 
-    with col2:
-        cardio = df[df["type"].str.contains("run|walk|cycle")]
-        if not cardio.empty and "distance" in cardio.columns:
-            fig = px.line(cardio, x="date", y="distance", color="type", title="Cardio Distance (km)")
-            st.plotly_chart(fig, use_container_width=True)
+    if df.empty:
+        st.info("No data in this range yet. Log a workout!")
+    else:
+        col1, col2 = st.columns(2)
+
+        # STRENGTH CHART
+        with col1:
+            strength = df[df["type"].str.contains("push|pull|sit", case=False)]
+            if not strength.empty:
+                fig = px.line(
+                    strength,
+                    x="date",
+                    y="reps",
+                    color="variation",
+                    facet_col="type",
+                    title="Strength Progress",
+                    markers=True,
+                    hover_data=["reps"]
+                )
+                fig.update_layout(height=400, legend_title="Variation")
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.write("No strength workouts.")
+
+        # CARDIO CHART
+        with col2:
+            cardio = df[df["type"].str.contains("run|walk|cycle")]
+            if not cardio.empty and "distance" in cardio.columns:
+                fig = px.bar(
+                    cardio,
+                    x="date",
+                    y="distance",
+                    color="type",
+                    title="Cardio Distance (km)",
+                    barmode="group",
+                    hover_data=["time", "pace", "avg_speed", "speed", "incline"]
+                )
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.write("No cardio yet.")
 
 # === PERSONAL BESTS ===
 if st.session_state.progress:

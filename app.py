@@ -46,21 +46,11 @@ def load_user_data():
             }
             valid_data = {}
             for key, expected_type in expected_keys.items():
-                if key in data:
-                    if key == "level" and isinstance(data[key], (int, float)) and data[key] >= 1:
-                        valid_data[key] = int(data[key])
-                    elif key in ["xp", "total_xp"] and isinstance(data[key], (int, float)) and data[key] >= 0:
-                        valid_data[key] = int(data[key])
-                    elif isinstance(data[key], expected_type):
-                        valid_data[key] = data[key]
-                    else:
-                        valid_data[key] = expected_type() if callable(expected_type) else (1 if key == "level" else 0 if key in ["xp", "total_xp"] else data[key])
-                        with open("error_log.txt", "a") as f:
-                            f.write(f"{datetime.now()}: Invalid {key} in user_data.json: {data[key]}\n")
+                if key in data and isinstance(data[key], expected_type):
+                    valid_data[key] = data[key]
                 else:
-                    valid_data[key] = expected_type() if callable(expected_type) else (1 if key == "level" else 0 if key in ["xp", "total_xp"] else None)
                     with open("error_log.txt", "a") as f:
-                        f.write(f"{datetime.now()}: Missing {key} in user_data.json\n")
+                        f.write(f"{datetime.now()}: Invalid {key} in user_data.json\n")
             return valid_data
     except json.JSONDecodeError as e:
         with open("error_log.txt", "a") as f:
@@ -147,11 +137,11 @@ if "initialized" not in st.session_state:
     }
     for key, value in defaults.items():
         try:
-            st.session_state[key] = user_data.get(key, value if key != "level" else 1)
+            st.session_state[key] = user_data.get(key, value)
         except AttributeError as e:
             with open("error_log.txt", "a") as f:
                 f.write(f"{datetime.now()}: AttributeError for key {key}: {str(e)}\n")
-            st.session_state[key] = value if key != "level" else 1
+            st.session_state[key] = value
     st.session_state["initialized"] = True
     save_user_data()
 
@@ -211,7 +201,7 @@ quest_pool = [
     {"task": f"Climb Spire #{random.randint(100, 999)}: 10 pull-ups", "xp": 15, "type": "pull_ups", "reps": 10, "desc": "Ascend to new heights!"},
     {"task": f"Ride Storm #{random.randint(100, 999)}: 10 km cycle", "xp": 15, "type": "cycle_outdoor", "distance": 10, "desc": "Speed through chaos!"},
     {"task": f"Strike Core #{random.randint(100, 999)}: 20 sit-ups", "xp": 10, "type": "sit_ups", "reps": 20, "desc": "Forge an iron midsection!"},
-    {"task": f"Mend Body #{random.randint(100, 999)}: 10 min stretch", "xp": 10, "type": "stretch", "time_min": 10, "desc": "Restore your vitality!"},
+    {"task": f"Mend Body #{random.randint(100, 999)}: 10 min stretch", "xp": 10, "type": "stretch", "time_one": 10, "desc": "Restore your vitality!"},
     {"task": f"Unleash Fury #{random.randint(100, 999)}: 20 min HIIT", "xp": 20, "type": "hiit", "time_min": 20, "desc": "Obliterate all weakness!"}
 ]
 
@@ -516,14 +506,6 @@ with st.sidebar:
         st.markdown(f"**{achievements[ach]['name']}**: {achievements[ach]['desc']} (+{achievements[ach]['xp']} XP)")
     if not st.session_state.achievements:
         st.info("No achievements yet. Complete quests to earn some! 🥇")
-    st.divider()
-    st.subheader("🔄 Reset Data (Debug)")
-    if st.button("Reset User Data", key="reset-data"):
-        st.session_state.clear()
-        if os.path.exists(DATA_FILE):
-            os.remove(DATA_FILE)
-        st.session_state["initialized"] = False
-        st.experimental_rerun()
 
 # === LLM INVOCATION ===
 def chain_invoke(chain, history, user_input):
@@ -551,30 +533,19 @@ def chain_invoke(chain, history, user_input):
 st.markdown("<h3 style='text-align: center; color: #f0f0f0;'>🏆 Cyberpunk HUD</h3>", unsafe_allow_html=True)
 col1, col2 = st.columns([1, 3])
 with col1:
-    level = 1  # Default
-    if "level" in st.session_state and st.session_state.level is not None:
-        try:
-            level = int(st.session_state.level)
-            if level < 1:
-                level = 1
-                st.session_state.level = 1
-        except (ValueError, TypeError) as e:
-            level = 1
-            st.session_state.level = 1
-            with open("error_log.txt", "a") as f:
-                f.write(f"{datetime.now()}: Invalid level value {st.session_state.get('level', 'unset')}: {str(e)}\n")
-    else:
+    try:
+        level = int(st.session_state.level)
+    except (ValueError, TypeError) as e:
+        level = 1
         st.session_state.level = 1
         with open("error_log.txt", "a") as f:
-            f.write(f"{datetime.now()}: Level key missing or None in session_state\n")
+            f.write(f"{datetime.now()}: Invalid level value: {str(e)}\n")
     st.metric("Level", level, key="level-display")
     st.caption(f"Title: {get_avatar_title(level)}")
-    xp = int(st.session_state.xp) if "xp" in st.session_state and isinstance(st.session_state.xp, (int, float)) else 0
-    total_xp = int(st.session_state.total_xp) if "total_xp" in st.session_state and isinstance(st.session_state.total_xp, (int, float)) else 0
     required_xp = 100 + 50 * (level - 1)
-    st.metric("XP", xp, f"{xp}/{required_xp}", key="xp-display")
-    st.progress(min(xp / required_xp, 1.0))
-    st.metric("Total XP", total_xp, key="total-xp-display")
+    st.metric("XP", st.session_state.xp, f"{st.session_state.xp}/{required_xp}", key="xp-display")
+    st.progress(min(st.session_state.xp / required_xp, 1.0))
+    st.metric("Total XP", st.session_state.total_xp, key="total-xp-display")
     fitness_df = pd.DataFrame(st.session_state.progress_fitness)
     nutrition_df = pd.DataFrame(st.session_state.progress_nutrition)
     if not fitness_df.empty:
@@ -1102,3 +1073,17 @@ with st.expander("🤝 Command Center"):
     form_prompt = st.text_area("Form Data", placeholder="E.g., My push-up form feels off...", key="form-input")
     if st.button("Analyze Form", key="form-button"):
         if form_prompt:
+            prompt = ChatPromptTemplate.from_template(f"""
+            You are {coach_name}, {'motivational strength coach' if gender == 'Male (Woody)' else 'graceful, empowering trainer'}.
+            Be fun, encouraging, under 120 words. Use emojis.
+            User: {form_prompt}
+            {coach_name}:
+            """)
+            chain = prompt | llm | StrOutputParser() if llm else None
+            with st.spinner("Scanning..."):
+                history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
+                response = chain_invoke(chain, history, form_prompt)
+                st.markdown(response)
+                st.session_state.messages.append({"role": "user", "content": form_prompt})
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                save_user_data()

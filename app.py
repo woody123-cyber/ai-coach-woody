@@ -46,7 +46,7 @@ def load_user_data():
                 "nutrition_starters": list, "onboarded": bool, "quick_prompt": (str, type(None)),
                 "xp_history": list, "daily_quests": dict, "last_quest_date": str,
                 "user_gender": str, "user_age": int, "height_cm": float, "bmr": int,
-                "all_quests_bonus": bool
+                "all_quests_bonus": bool, "skill_levels": dict
             }
             valid_data = {}
             for key, expected_type in expected_keys.items():
@@ -71,7 +71,8 @@ def save_user_data():
         "name", "body_weight_kg", "weight_unit", "weight_goal", "calorie_goal",
         "macro_goal", "fitness_starters", "nutrition_starters", "onboarded",
         "quick_prompt", "xp_history", "daily_quests", "last_quest_date",
-        "user_gender", "user_age", "height_cm", "bmr", "all_quests_bonus"
+        "user_gender", "user_age", "height_cm", "bmr", "all_quests_bonus",
+        "skill_levels"
     ]
     data = {k: st.session_state.get(k) for k in keys_to_save if k in st.session_state}
     try:
@@ -117,10 +118,30 @@ if "initialized" not in st.session_state:
         "bmr": 0,
         "daily_quests": {},
         "last_quest_date": "",
-        "all_quests_bonus": False
+        "all_quests_bonus": False,
+        "skill_levels": {  # New: Skill levels 1-60, separate from main XP
+            "push_ups": {"level": 1, "xp": 0},
+            "pull_ups": {"level": 1, "xp": 0},
+            "sit_ups": {"level": 1, "xp": 0},
+            "squats": {"level": 1, "xp": 0},
+            "plank": {"level": 1, "xp": 0},
+            "run": {"level": 1, "xp": 0},
+            "walk_outdoor": {"level": 1, "xp": 0},
+            "walk_treadmill": {"level": 1, "xp": 0},
+            "cycle_outdoor": {"level": 1, "xp": 0},
+            "cycle_static": {"level": 1, "xp": 0},
+            "stretch": {"level": 1, "xp": 0},
+            "hiit": {"level": 1, "xp": 0},
+            "meal_log": {"level": 1, "xp": 0}  # For nutrition
+        }
     }
     for key, value in defaults.items():
-        st.session_state[key] = user_data.get(key, value)
+        try:
+            st.session_state[key] = user_data.get(key, value)
+        except AttributeError as e:
+            with open("error_log.txt", "a") as f:
+                f.write(f"{datetime.now()}: AttributeError for key {key}: {str(e)}\n")
+            st.session_state[key] = value
     st.session_state["initialized"] = True
     save_user_data()
 
@@ -628,55 +649,13 @@ if st.session_state.progress_fitness or st.session_state.progress_nutrition:
 
 # === PROGRESS SECTION ===
 st.subheader("Progress")
-if st.session_state.progress_fitness:
-    fitness_df = pd.DataFrame(st.session_state.progress_fitness)
-    fitness_df["date"] = pd.to_datetime(fitness_df["date"])
-    fitness_df = fitness_df[fitness_df["date"] >= datetime.now() - pd.Timedelta(days=30)]
-    col1, col2 = st.columns(2)
-    with col1:
-        strength = fitness_df[fitness_df["type"].str.contains("push|pull|sit|squat|plank|hiit|stretch")]
-        if not strength.empty and "reps" in strength.columns:
-            strength = strength.dropna(subset=["reps"])
-            if not strength.empty:
-                fig = px.line(strength, x="date", y="reps", color="variation", facet_col="type", markers=True, title="Strength Progress")
-                fig.update_layout(font=dict(size=14))
-                st.plotly_chart(fig, use_container_width=True)
-    with col2:
-        cardio = fitness_df[fitness_df["type"].str.contains("run|walk|cycle")]
-        if not cardio.empty and "distance" in cardio.columns:
-            cardio_dist = cardio.dropna(subset=["distance"])
-            if not cardio_dist.empty:
-                fig = px.bar(cardio_dist, x="date", y="distance", color="type", barmode="group", title="Cardio Progress")
-                fig.update_layout(font=dict(size=14))
-                st.plotly_chart(fig, use_container_width=True)
-
-if st.session_state.progress_nutrition:
-    nutrition_df = pd.DataFrame(st.session_state.progress_nutrition)
-    nutrition_df["date"] = pd.to_datetime(nutrition_df["date"])
-    nutrition_df = nutrition_df[nutrition_df["date"] >= datetime.now() - pd.Timedelta(days=30)]
-    fig = px.bar(
-        nutrition_df,
-        x="date",
-        y=["protein", "carbs", "fats"],
-        title="Daily Macros (g)",
-        color_discrete_map={"protein": "#1f77b4", "carbs": "#2ca02c", "fats": "#d62728"}
-    )
-    fig.update_layout(font=dict(size=14))
-    st.plotly_chart(fig, use_container_width=True)
-    daily_calories = nutrition_df.groupby(nutrition_df["date"].dt.date)["calories"].sum().reset_index()
-    daily_calories["goal"] = st.session_state.calorie_goal
-    fig = px.line(
-        daily_calories,
-        x="date",
-        y=["calories", "goal"],
-        title="Daily Calories vs. Goal",
-        labels={"value": "Calories", "variable": "Type"},
-        markers=True
-    )
-    fig.update_traces(line=dict(color="#1f77b4"), selector=dict(name="calories"))
-    fig.update_traces(line=dict(color="#ff7f0e", dash="dash"), selector=dict(name="goal"))
-    fig.update_layout(font=dict(size=14))
-    st.plotly_chart(fig, use_container_width=True)
+# New: Skill Levels Display
+st.subheader("Skills")
+skill_df = pd.DataFrame([
+    {"Skill": key.replace("_", " ").title(), "Level": value["level"], "XP": f"{value['xp']}/{100 + 50 * (value['level'] - 1)}"}
+    for key, value in st.session_state.skill_levels.items()
+])
+st.table(skill_df)
 
 if st.session_state.xp_history:
     xp_df = pd.DataFrame(st.session_state.xp_history)

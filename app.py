@@ -3,15 +3,12 @@ import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-import whisper
-from pydub import AudioSegment
 import cv2
 import numpy as np
 from PIL import Image
 import plotly.express as px
 import pandas as pd
 from datetime import datetime
-import os
 
 # === CONFIG ===
 st.set_page_config(page_title="Coach Woody", page_icon="💪", layout="centered")
@@ -55,7 +52,7 @@ if "messages" not in st.session_state:
     st.session_state.level = "Beginner"
     st.session_state.goal = "Run a 5K"
     st.session_state.part = "Part 1"
-    st.session_state.progress = []  # List of (date, value)
+    st.session_state.progress = []
 
 # === SIDEBAR ===
 with st.sidebar:
@@ -76,26 +73,6 @@ with st.sidebar:
         fig = px.line(df, x="date", y="pushups", title="Push-up Progress")
         st.plotly_chart(fig, use_container_width=True)
 
-# === VOICE INPUT ===
-st.subheader("Voice Input")
-audio = st.experimental_audio_input# === VOICE INPUT (Browser Mic) ===
-st.subheader("Voice Input")
-audio_bytes = st.experimental_audio_input("Speak to Woody")
-
-if audio_bytes:
-    st.audio(audio_bytes, format="audio/wav")
-    st.info("Voice recorded! (Speech-to-text coming in v2 — type for now)")
-    # Future: Use Web Speech API via st.components.v1.html("Speak to Woody")
-if audio:
-    with st.spinner("Listening..."):
-        audio_segment = AudioSegment.from_file(audio)
-        audio_segment.export("temp.wav", format="wav")
-        model = whisper.load_model("base")
-        result = model.transcribe("temp.wav")
-        user_text = result["text"]
-        st.session_state.messages.append({"role": "user", "content": user_text})
-        st.chat_message("user").write(user_text)
-
 # === PHOTO FORM CHECK ===
 st.subheader("Upload Form Photo")
 uploaded_file = st.file_uploader("Snap a push-up/squat", type=["jpg", "png"])
@@ -103,44 +80,11 @@ if uploaded_file:
     image = Image.open(uploaded_file)
     st.image(image, caption="Your form")
     
-    # Simple pose detection (mock with real logic)
+    # Edge detection feedback
     img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
     gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
     edges = cv2.Canny(gray, 50, 150)
     lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=100, minLineLength=100, maxLineGap=10)
     
     feedback = "Great form! Keep core tight."
-    if lines is not None and len(lines) < 5:
-        feedback = "Warning: Your back might be sagging. Keep a straight line from head to heels!"
-    elif lines is not None and len(lines) > 15:
-        feedback = "Warning: Elbows flaring out. Keep them at 45° to your body."
-    
-    st.success(feedback)
-    st.session_state.messages.append({"role": "assistant", "content": feedback})
-
-# === CHAT ===
-st.title("Coach Woody")
-
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-if user_input := st.chat_input("Type or speak..."):
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
-
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            history = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-6:]])
-            kwargs = {
-                "level": st.session_state.level,
-                "goal": st.session_state.goal,
-                "history": history,
-                "input": user_input
-            }
-            if mode == "IELTS Speaking Coach":
-                kwargs["part"] = st.session_state.part
-            response = chain.invoke(kwargs)
-        st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+    if

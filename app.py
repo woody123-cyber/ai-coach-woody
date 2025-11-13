@@ -156,16 +156,26 @@ with st.sidebar:
     st.image("https://em-content.zobj.net/source/apple/118/trophy_1f3c6.png", width=80)
     st.title("Coach Woody")
 
-    if not user["name"]:
-        name = st.text_input("What's your name, warrior?", placeholder="Enter name...")
-        if st.button("Begin Journey"):
+    # Guard for onboarding state
+    if "onboarded" not in st.session_state:
+        st.session_state.onboarded = False
+
+    if not st.session_state.onboarded:
+        st.markdown("### Start Your Journey")
+        name = st.text_input("What's your name, warrior?", placeholder="Enter name...", key="name_input")
+        
+        if st.button("Begin Journey", use_container_width=True):
             if name.strip():
-                user["name"] = name.strip().title()
-                add_xp(50, "Joined the gym!")
-                unlock_achievement("first_lift")
+                st.session_state.name_input = name.strip().title()
+                st.session_state.onboarded = True
+                # Trigger rerun once to update UI
+                st.success(f"Welcome, {st.session_state.name_input}! Let's crush it! 🎉")
                 st.rerun()
+            else:
+                st.error("Enter a name to begin!")
     else:
-        st.markdown(f"## Welcome, **{user['name']}**!")
+        # Post-onboarding sidebar
+        st.markdown(f"## Welcome, **{st.session_state.name_input}**!")
         st.markdown(f"<div class='level-badge'>LV.{user['level']}</div>", unsafe_allow_html=True)
 
         col1, col2 = st.columns(2)
@@ -180,6 +190,11 @@ with st.sidebar:
 
         st.markdown("---")
         st.caption("💡 *Log a workout to earn XP!*")
+
+        # Reset button for testing (remove in production)
+        if st.button("Reset Journey (Debug)"):
+            st.session_state.onboarded = False
+            st.rerun()
 
 # === MAIN APP ===
 if not user["name"]:
